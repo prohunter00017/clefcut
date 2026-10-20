@@ -177,7 +177,7 @@ export function brandFromFolder(dirArg, { root }) {
   if (!fonts.heading && !fonts.body) notes.push('no fonts found');
 
   logos.sort((a, b) => b.score - a.score);
-  const assetsDir = path.join(root, 'sagecut', 'brand-assets');
+  const assetsDir = path.join(root, 'clefcut', 'brand-assets');
   const logoFiles = [];
   for (const l of logos.slice(0, 2)) {
     fs.mkdirSync(assetsDir, { recursive: true });

@@ -1,4 +1,4 @@
-// sagecut baseline prepare <video> [--frames 10]    sagecut baseline measure <marker>
+// clefcut baseline prepare <video> [--frames 10]    clefcut baseline measure <marker>
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -11,7 +11,7 @@ import { fileSha12 } from '../sweep/images.mjs';
 
 export const help = 'Record the time and tokens of one critic reviewing N frames the old way (baseline for the results card).';
 
-export const MARKER_PREFIX = 'SAGECUT-BASELINE-';
+export const MARKER_PREFIX = 'CLEFCUT-BASELINE-';
 
 // N frame numbers spread evenly over the video (the middle of N equal parts).
 export function pickFrames(total, n) {
@@ -43,7 +43,7 @@ After the last frame, write the line DONE and the number of frames you opened.
 async function prepare(argv, { root }) {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
     root: { type: 'string' }, frames: { type: 'string' }, json: { type: 'boolean' } } });
-  if (!positionals.length) throw new Error('usage: sagecut baseline prepare <video> [--frames 10]');
+  if (!positionals.length) throw new Error('usage: clefcut baseline prepare <video> [--frames 10]');
   const video = path.resolve(positionals[0]);
   if (!fs.existsSync(video)) throw new Error(`video not found: ${video}`);
   const n = Math.max(1, Math.round(Number(values.frames) || 10));
@@ -68,19 +68,19 @@ async function prepare(argv, { root }) {
   say(`folder: ${path.relative(root, dir) || dir}`);
   say(`Start ONE critic sub-agent with exactly this prompt (the first line is the marker; do not change it):\n`);
   say(prompt);
-  say(`Then run: sagecut baseline measure ${marker}`);
+  say(`Then run: clefcut baseline measure ${marker}`);
   return 0;
 }
 
 async function measure(argv, { root }) {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { root: { type: 'string' }, json: { type: 'boolean' } } });
-  if (!positionals.length) throw new Error('usage: sagecut baseline measure <marker>');
+  if (!positionals.length) throw new Error('usage: clefcut baseline measure <marker>');
   const raw = positionals[0];
   const id = raw.startsWith(MARKER_PREFIX) ? raw.slice(MARKER_PREFIX.length) : raw;
   const marker = `${MARKER_PREFIX}${id}`;
   const dir = path.join(qaDir(root), `baseline-${id}`);
   const metaFile = path.join(dir, 'meta.json');
-  if (!fs.existsSync(metaFile)) throw new Error(`no baseline folder for ${marker} (${dir}). Run "sagecut baseline prepare <video>" first.`);
+  if (!fs.existsSync(metaFile)) throw new Error(`no baseline folder for ${marker} (${dir}). Run "clefcut baseline prepare <video>" first.`);
   const meta = readJson(metaFile);
   const m = await measureMarker(marker, { sinceMs: Date.parse(meta.created) - 60_000 });
   if (!m.agents) throw new Error(`no Claude Code sub-agent file contains ${marker}. The critic must start with the prompt in ${path.join(dir, 'prompt.md')} and must have finished.`);
@@ -114,6 +114,6 @@ export async function run(argv, ctx) {
   const [sub, ...rest] = args;
   if (sub === 'prepare') return prepare(i >= 0 ? [...rest, '--root', argv[i + 1]] : rest, ctx);
   if (sub === 'measure') return measure(i >= 0 ? [...rest, '--root', argv[i + 1]] : rest, ctx);
-  console.log('usage: sagecut baseline prepare <video> [--frames 10]\n       sagecut baseline measure <marker>');
+  console.log('usage: clefcut baseline prepare <video> [--frames 10]\n       clefcut baseline measure <marker>');
   return sub === '--help' || sub === '-h' ? 0 : 2;
 }

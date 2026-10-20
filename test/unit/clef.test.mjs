@@ -12,7 +12,7 @@ const png = (w, h) => `data:image/png;base64,${encodePng(Buffer.alloc(w * h * 3)
 const jpeg = (w, h) => `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, ...Array(14).fill(0),
   0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 3, ...Array(9).fill(0), 0xff, 0xd9]).toString('base64')}`;
 
-const ENV_KEYS = ['SAGECUT_HOME', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLEF_MODEL'];
+const ENV_KEYS = ['CLEFCUT_HOME', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLEF_MODEL'];
 
 // A temp project and user folder, with the Cloudflare variables cleared; dotenv is written to the project .env.
 async function withEnv(dotenv, fn) {
@@ -21,7 +21,7 @@ async function withEnv(dotenv, fn) {
   fs.mkdirSync(home, { recursive: true }); fs.mkdirSync(proj, { recursive: true });
   const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
   for (const k of ENV_KEYS) delete process.env[k];
-  process.env.SAGECUT_HOME = home;
+  process.env.CLEFCUT_HOME = home;
   if (dotenv) fs.writeFileSync(path.join(proj, '.env'), dotenv);
   try { return await fn(proj); } finally {
     for (const k of ENV_KEYS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
@@ -122,7 +122,7 @@ test('ClefClient.decide: one request per picture, a bad picture fails alone, usa
       assert.match(r.rows[1].answers.q.error, /HTTP 400/);
       assert.deepEqual(r.usage, { billed_input_tokens: 87, output_tokens: 1, image_tokens: 513, calls: 2 });
       assert.ok(Math.abs(r.usd - (600 * 0.24) / 1e6) < 1e-12);
-      const log = fs.readFileSync(path.join(proj, 'sagecut', 'metrics', 'clef.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+      const log = fs.readFileSync(path.join(proj, 'clefcut', 'metrics', 'clef.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
       assert.equal(log.length, 1); assert.equal(log[0].model, 'clef'); assert.equal(log[0].what, 'unit'); assert.equal(log[0].tag, 'test');
     }));
 });
@@ -221,8 +221,8 @@ test('ClefClient: workers below 1 still run the requests', async () => {
 
 test('loadConfig: question_bank resolves against the project, not the current folder', async () => {
   await withEnv('', async (proj) => {
-    fs.mkdirSync(path.join(proj, 'sagecut'), { recursive: true });
-    fs.writeFileSync(path.join(proj, 'sagecut', 'sagecut.yaml'), 'question_bank: sagecut/my-bank.yaml\n');
-    assert.equal(loadConfig(proj).questionBankPath, path.join(proj, 'sagecut', 'my-bank.yaml'));
+    fs.mkdirSync(path.join(proj, 'clefcut'), { recursive: true });
+    fs.writeFileSync(path.join(proj, 'clefcut', 'clefcut.yaml'), 'question_bank: clefcut/my-bank.yaml\n');
+    assert.equal(loadConfig(proj).questionBankPath, path.join(proj, 'clefcut', 'my-bank.yaml'));
   });
 });

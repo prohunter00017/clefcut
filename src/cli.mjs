@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// sagecut <command> [args]. Each command is src/commands/<name>.mjs exporting
+// clefcut <command> [args]. Each command is src/commands/<name>.mjs exporting
 import { findProjectRoot } from './core/paths.mjs';
 import { loadConfig } from './core/config.mjs';
 import { VERSION } from './core/version.mjs';
@@ -18,15 +18,16 @@ import * as deliverCheck from './commands/deliver-check.mjs';
 import * as splice from './commands/splice.mjs';
 import * as onboard from './commands/onboard.mjs';
 import * as savings from './commands/savings.mjs';
+import * as review from './commands/review.mjs';
 
 const COMMANDS = {
-  doctor, init, brand, 'check-schedule': checkSchedule, gate, sweep, triage, ask, baseline, numbers,
+  review, doctor, init, brand, 'check-schedule': checkSchedule, gate, sweep, triage, ask, baseline, numbers,
   'deliver-check': deliverCheck, splice, onboard, savings,
 };
 
 function usage() {
   const lines = Object.entries(COMMANDS).map(([k, m]) => `  ${k.padEnd(15)} ${m.help || ''}`);
-  return `sagecut ${VERSION}: video QA for Remotion with the Clef decision model (Cloudflare Workers AI)\n\nusage: sagecut <command> [options]\n\n${lines.join('\n')}\n\nsagecut <command> --help for the options of one command.`;
+  return `clefcut ${VERSION}: video QA for Remotion with the Clef decision model (Cloudflare Workers AI)\n\nusage: clefcut <command> [options]\n\n${lines.join('\n')}\n\nclefcut <command> --help for the options of one command.`;
 }
 
 async function main() {
@@ -47,7 +48,7 @@ async function main() {
 }
 
 main().then((code) => { process.exitCode = code ?? 0; }).catch((e) => {
-  console.error(`sagecut: ${e.message}`);
-  if (process.env.SAGECUT_DEBUG) console.error(e.stack);
+  console.error(`clefcut: ${e.message}`);
+  if (process.env.CLEFCUT_DEBUG) console.error(e.stack);
   process.exitCode = 2;
 });

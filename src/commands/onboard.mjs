@@ -1,16 +1,16 @@
-// sagecut onboard status|welcome|done: the onboarding state of this user (~/.sagecut/state.json).
+// clefcut onboard status|welcome|done: the onboarding state of this user (~/.clefcut/state.json).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { userDataDir, pluginRoot, sagecutDir } from '../core/paths.mjs';
+import { userDataDir, pluginRoot, clefcutDir } from '../core/paths.mjs';
 import { loadClefEnv, KEY_PAGE } from '../core/env.mjs';
 import { readJson, writeJson, say } from '../core/log.mjs';
 
 export const help = 'onboarding state: status | welcome | done';
 
 const stateFile = () => path.join(userDataDir(), 'state.json');
-const FALLBACK = 'Welcome to SageCut, a way to produce Remotion videos faster and cheaper, with every frame checked by the Clef decision model on Cloudflare Workers AI.';
+const FALLBACK = 'Welcome to ClefCut, a way to produce Remotion videos faster and cheaper, with every frame checked by the Clef decision model on Cloudflare Workers AI.';
 
 function isRemotionProject(root) {
   try {
@@ -25,8 +25,8 @@ export function status(root, config) {
   return {
     onboarded: Boolean(state.onboarded),
     hasKey: loadClefEnv(root).hasKey,
-    hasBrand: fs.existsSync(config ? config.brandPath : path.join(sagecutDir(root), 'brand.yaml')),
-    hasSchedule: fs.existsSync(config ? config.schedulePath : path.join(sagecutDir(root), 'schedule.json')),
+    hasBrand: fs.existsSync(config ? config.brandPath : path.join(clefcutDir(root), 'brand.yaml')),
+    hasSchedule: fs.existsSync(config ? config.schedulePath : path.join(clefcutDir(root), 'schedule.json')),
     isRemotionProject: isRemotionProject(root),
     keyPage: KEY_PAGE,
   };
@@ -42,7 +42,7 @@ function welcomeText() {
 export async function run(argv, ctx) {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { json: { type: 'boolean' }, root: { type: 'string' }, help: { type: 'boolean' } } });
   const sub = positionals[0];
-  if (values.help || !sub) { say('usage: sagecut onboard status [--json] | welcome | done'); return values.help ? 0 : 2; }
+  if (values.help || !sub) { say('usage: clefcut onboard status [--json] | welcome | done'); return values.help ? 0 : 2; }
   if (sub === 'status') {
     const s = status(ctx.root, ctx.config);
     if (values.json) say(JSON.stringify(s));
@@ -56,6 +56,6 @@ export async function run(argv, ctx) {
     say('Onboarding finished.');
     return 0;
   }
-  console.error(`sagecut onboard: unknown "${sub}". Use status, welcome or done.`);
+  console.error(`clefcut onboard: unknown "${sub}". Use status, welcome or done.`);
   return 2;
 }

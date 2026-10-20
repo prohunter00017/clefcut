@@ -1,9 +1,9 @@
-// sagecut brand from-url | from-folder | set | use | show | list
+// clefcut brand from-url | from-folder | set | use | show | list
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import YAML from 'yaml';
-import { sagecutDir, userDataDir, ensureDir } from '../core/paths.mjs';
+import { clefcutDir, userDataDir, ensureDir } from '../core/paths.mjs';
 import { loadBrand } from '../core/brand.mjs';
 import { say } from '../core/log.mjs';
 import { brandFromUrl } from '../brand/fromurl.mjs';
@@ -12,12 +12,12 @@ import { setBrand, slug } from '../brand/write.mjs';
 
 export const help = 'make or load the brand: from-url | from-folder | set | use | show | list';
 
-const USAGE = `usage: sagecut brand from-url <URL>
-       sagecut brand from-folder <PATH>
-       sagecut brand set <FILE.yaml|FILE.json>
-       sagecut brand use <NAME>
-       sagecut brand show [--json]
-       sagecut brand list [--json]`;
+const USAGE = `usage: clefcut brand from-url <URL>
+       clefcut brand from-folder <PATH>
+       clefcut brand set <FILE.yaml|FILE.json>
+       clefcut brand use <NAME>
+       clefcut brand show [--json]
+       clefcut brand list [--json]`;
 
 function summary(b) {
   const c = b.colors;
@@ -31,7 +31,7 @@ function summary(b) {
 }
 
 function writeDraft(root, draft) {
-  const f = path.join(sagecutDir(root), 'brand.draft.yaml');
+  const f = path.join(clefcutDir(root), 'brand.draft.yaml');
   ensureDir(path.dirname(f));
   fs.writeFileSync(f, YAML.stringify(draft));
   return f;
@@ -44,12 +44,12 @@ export async function run(argv, ctx) {
   const root = ctx.root;
 
   if (sub === 'from-url') {
-    if (!arg) { console.error('sagecut brand from-url: give a URL. Example: sagecut brand from-url https://example.com'); return 2; }
+    if (!arg) { console.error('clefcut brand from-url: give a URL. Example: clefcut brand from-url https://example.com'); return 2; }
     const r = await brandFromUrl(arg, { root });
     for (const w of r.warnings) console.error(`note: ${w}`);
     if (!r.found.colours && !r.found.fonts && !r.found.logos) {
       console.log(`Found no colours, fonts or logo on ${arg}. The page may build its styles with JavaScript.`);
-      console.log('Use "sagecut brand from-folder <PATH>" with a brand kit folder, or answer the brand questions in /sagecut:start.');
+      console.log('Use "clefcut brand from-folder <PATH>" with a brand kit folder, or answer the brand questions in /clefcut:start.');
       return 1;
     }
     const f = writeDraft(root, r.draft);
@@ -60,44 +60,44 @@ export async function run(argv, ctx) {
     if (!r.cssFiles) console.log('No stylesheet is linked from the page. Styles built by JavaScript are not read.');
     console.log('This reads static HTML and CSS only. Styles built by JavaScript are not read. A website gives no video format, so check the format yourself.');
     console.log(`Draft: ${path.relative(root, f)}  (${r.cssFiles} CSS file(s), ${(r.bytes / 1024).toFixed(0)} KB read)`);
-    console.log('Confirm that you have the right to use these files before you use this brand. Then run "sagecut brand set sagecut/brand.draft.yaml".');
+    console.log('Confirm that you have the right to use these files before you use this brand. Then run "clefcut brand set clefcut/brand.draft.yaml".');
     return 0;
   }
 
   if (sub === 'from-folder') {
-    if (!arg) { console.error('sagecut brand from-folder: give a folder path.'); return 2; }
+    if (!arg) { console.error('clefcut brand from-folder: give a folder path.'); return 2; }
     const r = brandFromFolder(arg, { root });
     for (const w of r.warnings) console.error(`note: ${w}`);
     if (!r.found.colours && !r.found.fonts && !r.found.logos) {
       console.log(`Found no colours, fonts or logo in ${arg} (${r.found.files} files read).`);
-      console.log('Answer the brand questions in /sagecut:start instead, or point to a folder with logo, font, CSS or guide files.');
+      console.log('Answer the brand questions in /clefcut:start instead, or point to a folder with logo, font, CSS or guide files.');
       return 1;
     }
     const f = writeDraft(root, r.draft);
     console.log(summary(r.draft));
     r.notes.forEach((n) => console.log(`read: ${n}`));
     console.log(`\nDraft: ${path.relative(root, f)}`);
-    console.log('Confirm that you have the right to use these files before you use this brand. Then run "sagecut brand set sagecut/brand.draft.yaml".');
+    console.log('Confirm that you have the right to use these files before you use this brand. Then run "clefcut brand set clefcut/brand.draft.yaml".');
     return 0;
   }
 
   if (sub === 'set') {
-    if (!arg) { console.error('sagecut brand set: give a brand file (.yaml or .json).'); return 2; }
-    try { await setBrand(path.resolve(arg), { root, log: (m) => say(m) }); } catch (e) { console.error(`sagecut: ${e.message}`); return e.errors ? 1 : 2; }
+    if (!arg) { console.error('clefcut brand set: give a brand file (.yaml or .json).'); return 2; }
+    try { await setBrand(path.resolve(arg), { root, log: (m) => say(m) }); } catch (e) { console.error(`clefcut: ${e.message}`); return e.errors ? 1 : 2; }
     return 0;
   }
 
   if (sub === 'use') {
-    if (!arg) { console.error('sagecut brand use: give a saved brand name. See "sagecut brand list".'); return 2; }
+    if (!arg) { console.error('clefcut brand use: give a saved brand name. See "clefcut brand list".'); return 2; }
     const f = path.join(userDataDir(), 'brands', `${slug(arg)}.yaml`);
-    if (!fs.existsSync(f)) { console.error(`No saved brand "${arg}" in ${path.dirname(f)}. See "sagecut brand list".`); return 2; }
-    try { await setBrand(f, { root, log: (m) => say(m) }); } catch (e) { console.error(`sagecut: ${e.message}`); return 2; }
+    if (!fs.existsSync(f)) { console.error(`No saved brand "${arg}" in ${path.dirname(f)}. See "clefcut brand list".`); return 2; }
+    try { await setBrand(f, { root, log: (m) => say(m) }); } catch (e) { console.error(`clefcut: ${e.message}`); return 2; }
     return 0;
   }
 
   if (sub === 'show') {
     const b = loadBrand(ctx.config.brandPath);
-    if (!b) { console.error('No brand file yet. Run /sagecut:start or "sagecut brand from-url <URL>".'); return 1; }
+    if (!b) { console.error('No brand file yet. Run /clefcut:start or "clefcut brand from-url <URL>".'); return 1; }
     say(values.json ? JSON.stringify(b, null, 1) : summary(b));
     return 0;
   }
@@ -109,6 +109,6 @@ export async function run(argv, ctx) {
     return 0;
   }
 
-  console.error(`sagecut brand: unknown "${sub}".\n${USAGE}`);
+  console.error(`clefcut brand: unknown "${sub}".\n${USAGE}`);
   return 2;
 }

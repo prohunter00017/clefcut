@@ -127,7 +127,7 @@ const must = (r, what) => { if (r.code !== 0) throw new Error(`${what} failed: $
 export async function applySplice(master, patchFile, [g0, g1], { root, out, log = () => {} }) {
   const plan = await planSplice(master, [g0, g1], { root });
   if (plan.g0 !== g0 || plan.g1 !== g1) {
-    throw new Error(`--frames ${g0}-${g1} is not GOP-aligned. Run "sagecut splice plan ${path.basename(master)} --frames ${g0}-${g1}": it gives ${plan.g0}-${plan.g1}.`);
+    throw new Error(`--frames ${g0}-${g1} is not GOP-aligned. Run "clefcut splice plan ${path.basename(master)} --frames ${g0}-${g1}": it gives ${plan.g0}-${plan.g1}.`);
   }
   const n = g1 - g0 + 1;
   const minfo = plan.info;
@@ -137,7 +137,7 @@ export async function applySplice(master, patchFile, [g0, g1], { root, out, log 
   if (Math.abs(pinfo.fps - minfo.fps) > 0.01) throw new Error(`The patch runs at ${pinfo.fps} fps; the master runs at ${minfo.fps} fps.`);
 
   const sei = readX264Options(master);
-  if (!sei.options) throw new Error('The master has no x264 encoder text, so SageCut cannot copy its encoder settings. Splice works on masters that x264 wrote (Remotion --codec h264).');
+  if (!sei.options) throw new Error('The master has no x264 encoder text, so ClefCut cannot copy its encoder settings. Splice works on masters that x264 wrote (Remotion --codec h264).');
   const bframes = Number((sei.options.match(/\bbframes=(\d+)/) || [])[1] || 0);
   const warnings = [];
   if (bframes > 0) warnings.push(`The master uses ${bframes} B-frames. The proof checks the result; use --codec h264 with bframes=0 for the safest splice.`);
@@ -147,7 +147,7 @@ export async function applySplice(master, patchFile, [g0, g1], { root, out, log 
   const sar11 = ms.sample_aspect_ratio === '1:1';
   const params = x264Params(sei.options, { sar11, minKeyint: n });
 
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sagecut-splice-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'clefcut-splice-'));
   const f = (name) => path.join(tmp, name);
   try {
     // 1. encode the patch with the master's settings

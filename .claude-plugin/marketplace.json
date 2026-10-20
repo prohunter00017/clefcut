@@ -1,15 +1,15 @@
 {
-  "name": "levantolabs",
-  "description": "Plugins from Levanto Labs",
-  "owner": { "name": "Levanto Labs", "url": "https://levanto.ai" },
+  "name": "clefcut",
+  "description": "ClefCut: Remotion video QA with Cloudflare Workers AI Clef (a fork of SageCut by Levanto Labs)",
+  "owner": { "name": "prohunter00017", "url": "https://github.com/prohunter00017" },
   "plugins": [
     {
-      "name": "sagecut",
+      "name": "clefcut",
       "source": "./",
-      "description": "House-standard QA for Remotion videos in your brand. Every frame is measured and read by the Clef decision model on Cloudflare Workers AI.",
-      "version": "0.3.0",
+      "description": "House-standard QA for Remotion videos in your brand. Every frame is measured and read by the Clef decision model on Cloudflare Workers AI. A fork of SageCut by Levanto Labs.",
+      "version": "0.4.0",
       "license": "MIT",
-      "keywords": ["remotion", "video", "qa", "brand", "clef", "cloudflare"]
+      "keywords": ["remotion", "video", "qa", "brand", "clef", "cloudflare", "workers-ai", "agent-skills"]
     }
   ]
 }

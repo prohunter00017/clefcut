@@ -14,8 +14,8 @@ import { validateBrand } from '../../src/core/brand.mjs';
 import * as brandCmd from '../../src/commands/brand.mjs';
 import { loadConfig } from '../../src/core/config.mjs';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sagecut-test-brand-'));
-process.env.SAGECUT_HOME = path.join(tmp, 'home');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'clefcut-test-brand-'));
+process.env.CLEFCUT_HOME = path.join(tmp, 'home');
 const mk = (n) => { const d = path.join(tmp, n); fs.mkdirSync(d, { recursive: true }); return d; };
 
 test('colour parsing', () => {
@@ -120,7 +120,7 @@ test('brand set copies fonts and logo, writes brand.yaml, brand.ts and the saved
   const { saved } = await setBrand(file, { root, log: (m) => msgs.push(m) });
   assert.ok(fs.existsSync(path.join(root, 'public', 'fonts', 'Display-Bold.woff2')));
   assert.ok(fs.existsSync(path.join(root, 'public', 'brand', 'mark.svg')));
-  assert.ok(fs.existsSync(path.join(root, 'sagecut', 'brand.yaml')));
+  assert.ok(fs.existsSync(path.join(root, 'clefcut', 'brand.yaml')));
   assert.ok(fs.existsSync(saved));
   const ts = fs.readFileSync(path.join(root, 'src', 'brand.ts'), 'utf8');
   assert.match(ts, /primary: "#1438d4"/);
@@ -194,7 +194,7 @@ test('brand set: a font that cannot be fetched leaves no stale font file in the 
     fonts: { heading: { family: 'Nope Sans', file: 'fonts/NopeSans-Bold.woff2', files: { 700: 'fonts/NopeSans-Bold.woff2' }, weights: [700] } } }));
   const orig = globalThis.fetch; globalThis.fetch = async () => { throw new Error('offline'); };
   try { await setBrand(file, { root, log: () => {} }); } finally { globalThis.fetch = orig; }
-  const b = YAML.parse(fs.readFileSync(path.join(root, 'sagecut', 'brand.yaml'), 'utf8'));
+  const b = YAML.parse(fs.readFileSync(path.join(root, 'clefcut', 'brand.yaml'), 'utf8'));
   assert.equal(b.fonts.heading.file, undefined);
   assert.equal(b.fonts.heading.files, undefined);
   assert.doesNotMatch(fs.readFileSync(path.join(root, 'src', 'brand.ts'), 'utf8'), /NopeSans/);

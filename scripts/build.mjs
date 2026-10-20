@@ -1,4 +1,4 @@
-// Build the single-file tool: src/cli.mjs -> bin/sagecut.mjs, plus the OCR worker and core wasm in bin/ocr/.
+// Build the single-file tool: src/cli.mjs -> bin/clefcut.mjs, plus the OCR worker and core wasm in bin/ocr/.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +36,7 @@ const placeholderPlugin = {
     build.onLoad({ filter: /.*/, namespace: 'placeholder' }, (args) => {
       const name = path.basename(args.path, '.mjs');
       return { loader: 'js', contents: `export const help = '(not built yet)';
-export async function run() { console.error('sagecut ${name}: this command is not in this build yet.'); return 2; }` };
+export async function run() { console.error('clefcut ${name}: this command is not in this build yet.'); return 2; }` };
     });
   },
 };
@@ -47,18 +47,18 @@ fs.mkdirSync(rel('bin/ocr'), { recursive: true });
 const metas = [];
 await esbuild.build({
   entryPoints: [rel('src/cli.mjs')],
-  outfile: rel('bin/sagecut.mjs'),
+  outfile: rel('bin/clefcut.mjs'),
   bundle: true, platform: 'node', format: 'esm', target: 'node18', legalComments: 'none',
-  banner: { js: "#!/usr/bin/env node\nimport { createRequire as __sagecutCreateRequire } from 'node:module';\nconst require = __sagecutCreateRequire(import.meta.url);\nimport { fileURLToPath as __sagecutFtu } from 'node:url';\nimport { dirname as __sagecutDirname } from 'node:path';\nconst __filename = __sagecutFtu(import.meta.url);\nconst __dirname = __sagecutDirname(__filename);" },
+  banner: { js: "#!/usr/bin/env node\nimport { createRequire as __clefcutCreateRequire } from 'node:module';\nconst require = __clefcutCreateRequire(import.meta.url);\nimport { fileURLToPath as __clefcutFtu } from 'node:url';\nimport { dirname as __clefcutDirname } from 'node:path';\nconst __filename = __clefcutFtu(import.meta.url);\nconst __dirname = __clefcutDirname(__filename);" },
   plugins: [placeholderPlugin],
   logLevel: 'warning', metafile: true,
 }).then((r) => { metas.push(r.metafile); });
-let tool = fs.readFileSync(rel('bin/sagecut.mjs'), 'utf8');
+let tool = fs.readFileSync(rel('bin/clefcut.mjs'), 'utf8');
 // keep one shebang (the source file has its own)
 const lines = tool.split('\n');
 const extra = lines.findIndex((l, i) => i > 0 && l.startsWith('#!'));
-if (extra > 0) { lines.splice(extra, 1); tool = lines.join('\n'); fs.writeFileSync(rel('bin/sagecut.mjs'), tool); }
-try { fs.chmodSync(rel('bin/sagecut.mjs'), 0o755); } catch { /* Windows */ }
+if (extra > 0) { lines.splice(extra, 1); tool = lines.join('\n'); fs.writeFileSync(rel('bin/clefcut.mjs'), tool); }
+try { fs.chmodSync(rel('bin/clefcut.mjs'), 0o755); } catch { /* Windows */ }
 
 await esbuild.build({
   entryPoints: [rel('node_modules/tesseract.js/src/worker-script/node/index.js')],
@@ -79,7 +79,7 @@ fs.copyFileSync(rel('node_modules/tesseract.js/LICENSE.md'), rel('bin/ocr/LICENS
 
 const size = (f) => (fs.statSync(f).size / 1024 / 1024).toFixed(2);
 console.log(`build ok: version ${Object.values(versions)[0]}`);
-console.log(`  bin/sagecut.mjs ${size(rel('bin/sagecut.mjs'))} MB`);
+console.log(`  bin/clefcut.mjs ${size(rel('bin/clefcut.mjs'))} MB`);
 console.log(`  bin/ocr/ ${fs.readdirSync(rel('bin/ocr')).map((f) => `${f} ${size(rel('bin/ocr', f))} MB`).join(', ')}`);
 console.log(`  assets/eng.traineddata ${size(rel('assets/eng.traineddata'))} MB`);
 if (placeholders.length) console.log(`  PLACEHOLDERS (command file missing): ${[...new Set(placeholders)].join(', ')}`);

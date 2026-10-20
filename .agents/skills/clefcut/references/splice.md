@@ -10,30 +10,34 @@ Use `splice` when a delivered video needs a change in a few seconds. You render 
 
 Do not use it when the change moves the timing of the rest of the video. If the number of frames changes, render the full video again.
 
+Splice needs a master encoded **without B-frames**. x264's default uses B-frames, and a splice into such a master fails the packet-timing proof. `splice plan` warns when the master has B-frames; render the full video in that case.
+
 ## Steps
 
 1. Change the code or the schedule for the frames A to B only.
 2. Plan the range. The tool finds the nearest range of whole groups of pictures (GOP):
-   `sagecut splice plan <master.mp4> --frames A-B`
+   `clefcut splice plan <master.mp4> --frames A-B`
    The output gives the range `G0-G1` and the render command.
 3. Render only that range:
    `npx remotion render <id> patch.mp4 --codec h264 --crf 17 --color-space bt709 --frames=G0-G1`
    Use the same settings as the master.
 4. Apply the patch:
-   `sagecut splice apply <master.mp4> patch.mp4 --frames G0-G1 --out <new-master.mp4>`
+   `clefcut splice apply <master.mp4> patch.mp4 --frames G0-G1 --out <new-master.mp4>`
    The tool uses the same x264 options and the same SPS as the master. It copies the streams outside the range without re-encoding.
 5. Read the proof file `<new-master>.proof.json`.
-6. Run `sagecut deliver-check <new-master.mp4>`.
+6. Run `clefcut deliver-check <new-master.mp4>`.
 7. Run the sweep on the frames of the changed range if the change touches text or layout.
 
 ## Read the proof
 
-The proof file has two checks:
+The proof file has four checks. All four must pass (`pass: true`):
 
 | Check | Pass condition |
 |---|---|
 | Decoded-frame hashes outside the range | Identical to the master. |
-| Packet pts, dts and duration | Identical to the master, everywhere. |
+| Video packet pts, dts and duration | Identical to the master, everywhere. |
+| Audio packet timing | Identical to the master. |
+| SPS/PPS of the new part | Identical to the master's (`spsIdenticalToMaster`). |
 
 If the hashes outside the range differ, the splice moved the picture. If the packet timestamps differ, the end of the video moved. In both cases, do not deliver the file. Check that the patch has the same frame rate, size and colour settings as the master. Then try again, or render the full video.
 

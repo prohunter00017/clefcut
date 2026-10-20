@@ -1,4 +1,4 @@
-// sagecut deliver-check <video> [--fix]: the delivery spec of the house rules, measured on the delivered file.
+// clefcut deliver-check <video> [--fix]: the delivery spec of the house rules, measured on the delivered file.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -72,10 +72,10 @@ export async function checkVideo(video, ctx, { frameSet = null, ocr = true } = {
   // audio, loudness, silence
   const audioMode = ['auto', 'required', 'none'].includes(ctx.config.audio) ? ctx.config.audio : 'auto';
   if (audioMode === 'none') {
-    add('audio stream', 'info', 'audio: none in sagecut.yaml; loudness and silence checks skipped');
+    add('audio stream', 'info', 'audio: none in clefcut.yaml; loudness and silence checks skipped');
   } else if (!info.hasAudio) {
-    if (audioMode === 'required') add('audio stream', 'fail', 'no audio stream (audio: required in sagecut.yaml)');
-    else add('audio stream', 'warn', 'no audio stream. If the video should have sound, add the track; if it is silent by design, set audio: none in sagecut/sagecut.yaml');
+    if (audioMode === 'required') add('audio stream', 'fail', 'no audio stream (audio: required in clefcut.yaml)');
+    else add('audio stream', 'warn', 'no audio stream. If the video should have sound, add the track; if it is silent by design, set audio: none in clefcut/clefcut.yaml');
   } else {
     add('audio stream', 'pass', 'present');
     const l = await loudness(video, { root });
@@ -110,7 +110,7 @@ export async function checkVideo(video, ctx, { frameSet = null, ocr = true } = {
   // placeholder text (OCR) and the test-width frame set
   if (ocr) {
     const engine = await tryCreateOcr();
-    if (!engine) add('placeholder text', 'skip', 'OCR not available (run "sagecut doctor")');
+    if (!engine) add('placeholder text', 'skip', 'OCR not available (run "clefcut doctor")');
     else {
       try {
         const step = Math.max(Math.round(fps), Math.floor(info.frames / 40));
@@ -164,7 +164,7 @@ export function finalFailures(checks, recheck) {
 export async function run(argv, ctx) {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
     fix: { type: 'boolean' }, out: { type: 'string' }, json: { type: 'boolean' }, root: { type: 'string' }, help: { type: 'boolean' } } });
-  if (values.help || !positionals[0]) { say('usage: sagecut deliver-check <video> [--fix] [--out FILE] [--json]'); return values.help ? 0 : 2; }
+  if (values.help || !positionals[0]) { say('usage: clefcut deliver-check <video> [--fix] [--out FILE] [--json]'); return values.help ? 0 : 2; }
   const video = path.resolve(positionals[0]);
   if (!fs.existsSync(video)) { console.error(`No such file: ${video}`); return 2; }
   const runDir = newRunDir(ctx.root, 'deliver');
@@ -172,7 +172,7 @@ export async function run(argv, ctx) {
   let fixed = null; let recheck = null;
   if (values.fix) {
     const out = path.resolve(values.out || path.join(path.dirname(video), `${path.basename(video, path.extname(video))}-delivery.mp4`));
-    if (out === video) { console.error('sagecut deliver-check: --out must not be the input file.'); return 2; }
+    if (out === video) { console.error('clefcut deliver-check: --out must not be the input file.'); return 2; }
     fixed = await fixVideo(video, checks, out, { root: ctx.root });
     if (fixed) recheck = (await checkVideo(out, ctx, { ocr: false })).checks;
   }

@@ -71,18 +71,18 @@ test('findMarkedFiles: sub-agent files whose first record holds the marker, via 
   const sub = path.join(proj, 'sess1', 'subagents');
   fs.mkdirSync(sub, { recursive: true });
   const mk = (file, text) => fs.writeFileSync(file, line({ type: 'user', message: { role: 'user', content: text } }) + '\n');
-  mk(path.join(sub, 'agent-aaa.jsonl'), `SAGECUT-BASELINE-abcd1234\nreview these`);
-  mk(path.join(sub, 'agent-bbb.jsonl'), 'SAGECUT-BASELINE-ffff0000\nother');
-  mk(path.join(proj, 'sess1.jsonl'), 'a user typed SAGECUT-BASELINE-abcd1234 here');       // a main session file: not a critic
+  mk(path.join(sub, 'agent-aaa.jsonl'), `CLEFCUT-BASELINE-abcd1234\nreview these`);
+  mk(path.join(sub, 'agent-bbb.jsonl'), 'CLEFCUT-BASELINE-ffff0000\nother');
+  mk(path.join(proj, 'sess1.jsonl'), 'a user typed CLEFCUT-BASELINE-abcd1234 here');       // a main session file: not a critic
   const old = process.env.CLAUDE_CONFIG_DIR;
   process.env.CLAUDE_CONFIG_DIR = cfg;
   try {
     assert.equal(claudeConfigDir(), cfg);
-    const hits = findMarkedFiles('SAGECUT-BASELINE-abcd1234');
+    const hits = findMarkedFiles('CLEFCUT-BASELINE-abcd1234');
     assert.deepEqual(hits.map((h) => path.basename(h)), ['agent-aaa.jsonl']);
     assert.equal(listSessionFiles().length, 3);
-    assert.deepEqual(findMarkedFiles('SAGECUT-BASELINE-abcd1234', { sinceMs: Date.now() + 100000 }), []);
-    assert.deepEqual(findMarkedFiles('SAGECUT-BASELINE-0000'), []);
+    assert.deepEqual(findMarkedFiles('CLEFCUT-BASELINE-abcd1234', { sinceMs: Date.now() + 100000 }), []);
+    assert.deepEqual(findMarkedFiles('CLEFCUT-BASELINE-0000'), []);
   } finally {
     if (old === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = old;
     fs.rmSync(cfg, { recursive: true, force: true });
@@ -116,11 +116,11 @@ test('findMarkedFiles: a marker does not match a longer marker that starts with 
   const cfg = tmp();
   const sub = path.join(cfg, 'projects', '-p', 's1', 'subagents');
   fs.mkdirSync(sub, { recursive: true });
-  fs.writeFileSync(path.join(sub, 'agent-x.jsonl'), line({ type: 'user', message: { role: 'user', content: 'SAGECUT-CRITIC-gate-20261020-101500-2\nreview' } }) + '\n');
+  fs.writeFileSync(path.join(sub, 'agent-x.jsonl'), line({ type: 'user', message: { role: 'user', content: 'CLEFCUT-CRITIC-gate-20261020-101500-2\nreview' } }) + '\n');
   const old = process.env.CLAUDE_CONFIG_DIR; process.env.CLAUDE_CONFIG_DIR = cfg;
   try {
-    assert.deepEqual(findMarkedFiles('SAGECUT-CRITIC-gate-20261020-101500'), []);
-    assert.equal(findMarkedFiles('SAGECUT-CRITIC-gate-20261020-101500-2').length, 1);
+    assert.deepEqual(findMarkedFiles('CLEFCUT-CRITIC-gate-20261020-101500'), []);
+    assert.equal(findMarkedFiles('CLEFCUT-CRITIC-gate-20261020-101500-2').length, 1);
   } finally {
     if (old === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = old;
     fs.rmSync(cfg, { recursive: true, force: true });

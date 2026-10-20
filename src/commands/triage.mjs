@@ -1,4 +1,4 @@
-// sagecut triage <sweep-run-dir> [--video FILE] [--edge N] [--json]
+// clefcut triage <sweep-run-dir> [--video FILE] [--edge N] [--json]
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -41,18 +41,25 @@ export async function run(argv, { root, config }) {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
     root: { type: 'string' }, video: { type: 'string' }, edge: { type: 'string' }, json: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help || !positionals.length) {
-    console.log('usage: sagecut triage <sweep-run-dir> [--video FILE] [--edge N] [--json]\n\n' +
+    console.log('usage: clefcut triage <sweep-run-dir> [--video FILE] [--edge N] [--json]\n\n' +
       'Explains sweep flags by the schedule (tolerance --edge frames, default 15), then asks Clef about the residual runs.\n' +
       'Each question has a synthetic control from your own frames. Writes triage.json and triage.md in the run folder.');
     return values.help ? 0 : 2;
   }
   if (values.json) setQuiet(true);
-  let dir = path.resolve(positionals[0]);
+  const out = await runTriage({ dir: positionals[0], video: values.video, edge: values.edge, root, config });
+  if (values.json) console.log(JSON.stringify(out)); else say(markdown(out));
+  return out.counts.confirmed || out.counts['to-measure'] ? 1 : 0;
+}
+
+// Triage of one sweep folder: writes triage.json and triage.md there, returns the result. run() and review use it.
+export async function runTriage({ dir: dirArg, video: videoArg, edge: edgeArg, root, config }) {
+  let dir = path.resolve(dirArg);
   if (fs.existsSync(dir) && fs.statSync(dir).isFile()) dir = path.dirname(dir);
   const sweepFile = path.join(dir, 'sweep.json');
-  if (!fs.existsSync(sweepFile)) throw new Error(`no sweep.json in ${dir}. Run "sagecut sweep <video>" first.`);
+  if (!fs.existsSync(sweepFile)) throw new Error(`no sweep.json in ${dir}. Run "clefcut sweep <video>" first.`);
   const sw = readJson(sweepFile);
-  const video = path.resolve(values.video || sw.video);
+  const video = path.resolve(videoArg || sw.video);
   if (!fs.existsSync(video)) throw new Error(`video not found: ${video}. Pass --video FILE.`);
   const sha = await fileSha12(video);
   if (sw.video_sha256_12 && sha !== sw.video_sha256_12) throw new Error(`${video} is not the video the sweep read (sha ${sha}, the sweep read ${sw.video_sha256_12}). Sweep this video first, or pass the swept file with --video.`);
@@ -60,7 +67,7 @@ export async function run(argv, { root, config }) {
   const ctx = loadContext(config);
   const bank = loadBank(config);
   const pmin = sw.pmin ?? bank.pmin ?? 0.8;
-  const edge = Math.round(num(values.edge, 15));
+  const edge = Math.round(num(edgeArg, 15));
   const gap = 3 * (sw.step || 1);
   const t0 = Date.now();
 
@@ -141,8 +148,7 @@ export async function run(argv, { root, config }) {
   writeJson(path.join(dir, 'triage.json'), out);
   const md = markdown(out);
   fs.writeFileSync(path.join(dir, 'triage.md'), md);
-  if (values.json) console.log(JSON.stringify(out)); else say(md);
-  return counts.confirmed || counts['to-measure'] ? 1 : 0;
+  return out;
 }
 
 function markdown(o) {

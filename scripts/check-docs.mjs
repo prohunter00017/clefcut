@@ -56,12 +56,12 @@ export async function checkDocs(root = HERE) {
     for (const q of quotes) if (!rd(f).includes(q)) errors.push(`${f} does not quote "${q}" of the reference rate in src/core/costs.mjs.`);
   }
   for (const f of ['README.md', 'skills/start/SKILL.md', 'skills/qa/SKILL.md']) {
-    if (/(?<!no )test video/i.test(rd(f))) errors.push(`${f} mentions a test video. SageCut has none.`);
+    if (/(?<!no )test video/i.test(rd(f))) errors.push(`${f} mentions a test video. ClefCut has none.`);
   }
 
   // 6. the footage limit is stated where users read
   for (const f of ['README.md', 'skills/qa/SKILL.md']) {
-    if (!/tested on motion graphics only/i.test(rd(f))) errors.push(`${f} does not state that SageCut is tested on motion graphics only.`);
+    if (!/tested on motion graphics only/i.test(rd(f))) errors.push(`${f} does not state that ClefCut is tested on motion graphics only.`);
   }
   return errors;
 }

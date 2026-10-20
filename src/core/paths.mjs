@@ -1,11 +1,12 @@
-// Paths for SageCut. Every path is built with node:path, so the same code works on Windows, macOS and Linux.
+// Paths for ClefCut. Every path is built with node:path, so the same code works on Windows, macOS and Linux.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export function pluginRoot() {
-  if (process.env.CLAUDE_PLUGIN_ROOT) return process.env.CLAUDE_PLUGIN_ROOT;
+  if (process.env.CLEFCUT_ROOT) return process.env.CLEFCUT_ROOT;            // the standalone skill launcher, in any agent
+  if (process.env.CLAUDE_PLUGIN_ROOT) return process.env.CLAUDE_PLUGIN_ROOT;  // the Claude Code plugin
   let dir = path.dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 5; i++) {
     if (fs.existsSync(path.join(dir, '.claude-plugin'))) return dir;
@@ -18,7 +19,7 @@ export function findProjectRoot(start = process.cwd()) {
   let dir = path.resolve(start);
   let remotionDir = null;
   for (;;) {
-    if (fs.existsSync(path.join(dir, 'sagecut', 'sagecut.yaml'))) return dir;
+    if (fs.existsSync(path.join(dir, 'clefcut', 'clefcut.yaml'))) return dir;
     const pj = path.join(dir, 'package.json');
     if (!remotionDir && fs.existsSync(pj)) {
       try {
@@ -33,13 +34,13 @@ export function findProjectRoot(start = process.cwd()) {
   }
 }
 
-// Per-project SageCut folder: <project>/sagecut
-export const sagecutDir = (root) => path.join(root, 'sagecut');
-export const qaDir = (root) => path.join(root, 'sagecut', 'qa');
-export const metricsDir = (root) => path.join(root, 'sagecut', 'metrics');
+// Per-project ClefCut folder: <project>/clefcut
+export const clefcutDir = (root) => path.join(root, 'clefcut');
+export const qaDir = (root) => path.join(root, 'clefcut', 'qa');
+export const metricsDir = (root) => path.join(root, 'clefcut', 'metrics');
 
 export function userDataDir() {
-  return process.env.SAGECUT_HOME || path.join(os.homedir(), '.sagecut');
+  return process.env.CLEFCUT_HOME || path.join(os.homedir(), '.clefcut');
 }
 
 export function ensureDir(dir) {
@@ -47,7 +48,7 @@ export function ensureDir(dir) {
   return dir;
 }
 
-// A new run folder under sagecut/qa: <prefix>-YYYYMMDD-HHMMSS (never overwrites an earlier run)
+// A new run folder under clefcut/qa: <prefix>-YYYYMMDD-HHMMSS (never overwrites an earlier run)
 export function newRunDir(root, prefix) {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');

@@ -1,4 +1,4 @@
-// sagecut doctor: checks the set-up and prints the fix for each failure.
+// clefcut doctor: checks the set-up and prints the fix for each failure.
 import fs from 'node:fs';
 import { parseArgs } from 'node:util';
 import { locate, run as ff } from '../core/ffmpeg.mjs';
@@ -27,10 +27,10 @@ export async function checks(ctx) {
     if (v.code === 0 && p.code === 0) {
       const ver = (v.stdout.toString().match(/ffmpeg version (\S+)/) || [])[1] || '?';
       if (t.source.startsWith('remotion:')) add('ffmpeg', 'pass', `ffmpeg ${ver} and ffprobe (source: ${t.source})`);
-      else add('ffmpeg', 'warn', `ffmpeg ${ver} and ffprobe (source: ${t.source})`, "using a system ffmpeg; in your Remotion project run npm install so SageCut uses Remotion's bundled ffmpeg");
-    } else add('ffmpeg', 'fail', 'ffmpeg or ffprobe did not run', 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set SAGECUT_FFMPEG and SAGECUT_FFPROBE.');
+      else add('ffmpeg', 'warn', `ffmpeg ${ver} and ffprobe (source: ${t.source})`, "using a system ffmpeg; in your Remotion project run npm install so ClefCut uses Remotion's bundled ffmpeg");
+    } else add('ffmpeg', 'fail', 'ffmpeg or ffprobe did not run', 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set CLEFCUT_FFMPEG and CLEFCUT_FFPROBE.');
   } catch (e) {
-    add('ffmpeg', 'fail', e.message.split('\n')[0], 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set SAGECUT_FFMPEG and SAGECUT_FFPROBE.');
+    add('ffmpeg', 'fail', e.message.split('\n')[0], 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set CLEFCUT_FFMPEG and CLEFCUT_FFPROBE.');
   }
 
   await clefChecks(root, add);
@@ -40,23 +40,23 @@ export async function checks(ctx) {
 
   if (fs.existsSync(ctx.config.brandPath)) {
     try { const b = loadBrand(ctx.config.brandPath); add('brand', 'pass', `brand "${b.name}" (${ctx.config.brand})`); }
-    catch (e) { add('brand', 'fail', e.message, 'Fix the listed fields, then run "sagecut brand set sagecut/brand.yaml".'); }
-  } else add('brand', 'warn', `no brand file at ${ctx.config.brand}`, 'Run /sagecut:start, or "sagecut brand from-url <URL>".');
+    catch (e) { add('brand', 'fail', e.message, 'Fix the listed fields, then run "clefcut brand set clefcut/brand.yaml".'); }
+  } else add('brand', 'warn', `no brand file at ${ctx.config.brand}`, 'Run "clefcut brand from-url <URL>" (or /clefcut:start in the Claude Code plugin).');
 
   if (fs.existsSync(ctx.config.schedulePath)) {
     try {
       const errs = validateSchedule(JSON.parse(fs.readFileSync(ctx.config.schedulePath, 'utf8')));
-      if (errs.length) add('schedule', 'fail', `${errs.length} error(s): ${errs[0]}`, 'Run "sagecut check-schedule" for the full list.');
+      if (errs.length) add('schedule', 'fail', `${errs.length} error(s): ${errs[0]}`, 'Run "clefcut check-schedule" for the full list.');
       else add('schedule', 'pass', ctx.config.schedule);
     } catch (e) { add('schedule', 'fail', e.message, 'Fix the JSON in the schedule file.'); }
-  } else add('schedule', 'warn', `no schedule at ${ctx.config.schedule}`, 'Run "sagecut init".');
+  } else add('schedule', 'warn', `no schedule at ${ctx.config.schedule}`, 'Run "clefcut init".');
   return out;
 }
 
 // The Cloudflare key, then one tiny question to the Clef model.
 async function clefChecks(root, add) {
   const env = loadClefEnv(root), model = `@cf/cloudflare/${env.model}`;
-  const fix = `Make an API token with the Workers AI permission at ${KEY_PAGE}, then put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env or ~/.sagecut/.env.`;
+  const fix = `Make an API token with the Workers AI permission at ${KEY_PAGE}, then put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env or ~/.clefcut/.env.`;
   if (env.hasKey) add('clef key', 'pass', `CLOUDFLARE_ACCOUNT_ID (${maskKey(env.account)}) and CLOUDFLARE_API_TOKEN (${maskKey(env.token)}) present, model ${env.model}`);
   else { add('clef key', 'fail', 'CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN not found', fix); return; }
   const rd = await new ClefClient({ root }).ready();
@@ -67,11 +67,11 @@ async function clefChecks(root, add) {
 
 export async function run(argv, ctx) {
   const { values } = parseArgs({ args: argv, options: { json: { type: 'boolean' }, root: { type: 'string' }, help: { type: 'boolean' } } });
-  if (values.help) { console.log('usage: sagecut doctor [--json]'); return 0; }
+  if (values.help) { console.log('usage: clefcut doctor [--json]'); return 0; }
   const results = await checks(ctx);
   const failed = results.some((r) => r.status === 'fail');
   if (values.json) { console.log(JSON.stringify({ version: VERSION, ok: !failed, checks: results }, null, 1)); return failed ? 1 : 0; }
-  console.log(`sagecut ${VERSION} doctor (project: ${ctx.root})`);
+  console.log(`clefcut ${VERSION} doctor (project: ${ctx.root})`);
   const mark = { pass: 'PASS', fail: 'FAIL', warn: 'WARN' };
   for (const r of results) {
     console.log(`${mark[r.status]}  ${r.name.padEnd(12)} ${r.detail}`);

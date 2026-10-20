@@ -1,7 +1,7 @@
 {
-  "name": "sagecut",
-  "version": "0.3.0",
-  "description": "SageCut: house-standard video QA for Remotion, with every frame checked by the Clef decision model on Cloudflare Workers AI.",
+  "name": "clefcut",
+  "version": "0.4.0",
+  "description": "ClefCut: house-standard video QA for Remotion, with every frame checked by the Clef decision model on Cloudflare Workers AI.",
   "private": true,
   "type": "module",
   "license": "MIT",

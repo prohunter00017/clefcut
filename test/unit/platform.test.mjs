@@ -12,8 +12,8 @@ import { loadConfig } from '../../src/core/config.mjs';
 import { validateSchedule } from '../../src/core/schedule.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sagecut-test-platform-'));
-process.env.SAGECUT_HOME = path.join(tmp, 'home');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'clefcut-test-platform-'));
+process.env.CLEFCUT_HOME = path.join(tmp, 'home');
 const proj = path.join(tmp, 'proj'); fs.mkdirSync(proj);
 fs.writeFileSync(path.join(proj, 'package.json'), JSON.stringify({ dependencies: { remotion: '4.0.0' } }));
 const ctx = () => ({ root: proj, config: loadConfig(proj) });
@@ -36,7 +36,7 @@ test('welcome hook prints once and never fails', () => {
   const env = { ...process.env, CLAUDE_PLUGIN_DATA: data };
   const run = () => spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'welcome.mjs')], { env, encoding: 'utf8' });
   const a = run(); assert.equal(a.status, 0);
-  assert.deepEqual(JSON.parse(a.stdout), { systemMessage: 'SageCut is installed. Type /sagecut:start to begin.' });
+  assert.deepEqual(JSON.parse(a.stdout), { systemMessage: 'ClefCut is installed. Type /clefcut:start to begin.' });
   const b = run(); assert.equal(b.status, 0); assert.equal(b.stdout, '');
   const bad = spawnSync(process.execPath, [path.join(ROOT, 'hooks', 'welcome.mjs')], { env: { ...process.env, CLAUDE_PLUGIN_DATA: path.join(__filename_dummy(), 'x') }, encoding: 'utf8' });
   assert.equal(bad.status, 0);
@@ -48,7 +48,7 @@ test('onboard status, welcome, done', async () => {
   const s = JSON.parse(r.text);
   assert.equal(s.onboarded, false); assert.equal(s.isRemotionProject, true); assert.equal(s.hasBrand, false); assert.ok(s.keyPage);
   r = await capture(() => onboard.run(['welcome'], ctx()));
-  assert.match(r.text, /SageCut/);
+  assert.match(r.text, /ClefCut/);
   r = await capture(() => onboard.run(['done'], ctx()));
   assert.equal(r.code, 0);
   r = await capture(() => onboard.run(['status', '--json'], ctx()));
@@ -60,26 +60,26 @@ test('init writes the files and never overwrites', async () => {
   fs.writeFileSync(path.join(proj, '.gitignore'), 'node_modules\n.env\n');
   let r = await capture(() => init.run(['--composition', 'Promo', '--fps', '60', '--frames', '600'], ctx()));
   assert.equal(r.code, 0);
-  for (const f of ['sagecut/sagecut.yaml', 'sagecut/schedule.json', 'src/sagecut/useSchedule.ts', '.env.example']) assert.ok(fs.existsSync(path.join(proj, f)), f);
-  assert.ok(fs.existsSync(path.join(proj, 'sagecut', 'metrics')));
-  const sched = JSON.parse(fs.readFileSync(path.join(proj, 'sagecut', 'schedule.json'), 'utf8'));
+  for (const f of ['clefcut/clefcut.yaml', 'clefcut/schedule.json', 'src/clefcut/useSchedule.ts', '.env.example']) assert.ok(fs.existsSync(path.join(proj, f)), f);
+  assert.ok(fs.existsSync(path.join(proj, 'clefcut', 'metrics')));
+  const sched = JSON.parse(fs.readFileSync(path.join(proj, 'clefcut', 'schedule.json'), 'utf8'));
   assert.deepEqual(validateSchedule(sched), []);
   assert.equal(sched.fps, 60);
   assert.deepEqual(sched.effects, []);
   assert.equal(sched.beats[0].elements[0].role, 'headline');
   assert.match(sched._help, /role/);
-  assert.match(fs.readFileSync(path.join(proj, 'sagecut', 'sagecut.yaml'), 'utf8'), /^audio: auto\s+#/m);
+  assert.match(fs.readFileSync(path.join(proj, 'clefcut', 'clefcut.yaml'), 'utf8'), /^audio: auto\s+#/m);
   const gi = fs.readFileSync(path.join(proj, '.gitignore'), 'utf8');
   assert.equal(gi.split('\n').filter((l) => l === '.env').length, 1);
-  assert.match(gi, /sagecut\/qa\/\*\/raw\//);
-  assert.match(fs.readFileSync(path.join(proj, 'sagecut', 'sagecut.yaml'), 'utf8'), /^composition: Promo$/m);
-  const ts = fs.readFileSync(path.join(proj, 'src', 'sagecut', 'useSchedule.ts'), 'utf8');
+  assert.match(gi, /clefcut\/qa\/\*\/raw\//);
+  assert.match(fs.readFileSync(path.join(proj, 'clefcut', 'clefcut.yaml'), 'utf8'), /^composition: Promo$/m);
+  const ts = fs.readFileSync(path.join(proj, 'src', 'clefcut', 'useSchedule.ts'), 'utf8');
   assert.match(ts, /export function useBeat/); assert.match(ts, /export const Scheduled/);
   // second run keeps everything
-  fs.writeFileSync(path.join(proj, 'sagecut', 'schedule.json'), '{"mine":true}');
+  fs.writeFileSync(path.join(proj, 'clefcut', 'schedule.json'), '{"mine":true}');
   r = await capture(() => init.run([], ctx()));
   assert.match(r.text, /Kept/);
-  assert.equal(fs.readFileSync(path.join(proj, 'sagecut', 'schedule.json'), 'utf8'), '{"mine":true}');
+  assert.equal(fs.readFileSync(path.join(proj, 'clefcut', 'schedule.json'), 'utf8'), '{"mine":true}');
 });
 
 test('doctor reports every check and masks the key', async () => {
@@ -100,28 +100,28 @@ test('doctor reports every check and masks the key', async () => {
 
 test('cleanup', () => { fs.rmSync(tmp, { recursive: true, force: true }); });
 
-test('cli: the savings hooks never fail on a broken sagecut.yaml (a Stop hook exit 2 blocks the agent)', () => {
+test('cli: the savings hooks never fail on a broken clefcut.yaml (a Stop hook exit 2 blocks the agent)', () => {
   const p = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-hook-'));
-  fs.mkdirSync(path.join(p, 'sagecut'), { recursive: true });
-  fs.writeFileSync(path.join(p, 'sagecut', 'sagecut.yaml'), 'brand: [unclosed\n\tbad: tab\n');
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'src', 'cli.mjs'), 'savings', 'stop'], { cwd: p, encoding: 'utf8', env: { ...process.env, SAGECUT_HOME: path.join(p, 'home') } });
+  fs.mkdirSync(path.join(p, 'clefcut'), { recursive: true });
+  fs.writeFileSync(path.join(p, 'clefcut', 'clefcut.yaml'), 'brand: [unclosed\n\tbad: tab\n');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'src', 'cli.mjs'), 'savings', 'stop'], { cwd: p, encoding: 'utf8', env: { ...process.env, CLEFCUT_HOME: path.join(p, 'home') } });
   assert.equal(r.status, 0, r.stderr);
   fs.rmSync(p, { recursive: true, force: true });
 });
 
 test('cli: --root=DIR works like --root DIR', () => {
   const target = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-root-')), here = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-cwd-'));
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'src', 'cli.mjs'), 'init', `--root=${target}`], { cwd: here, encoding: 'utf8', env: { ...process.env, SAGECUT_HOME: path.join(here, 'home') } });
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'src', 'cli.mjs'), 'init', `--root=${target}`], { cwd: here, encoding: 'utf8', env: { ...process.env, CLEFCUT_HOME: path.join(here, 'home') } });
   assert.equal(r.status, 0, r.stderr);
-  assert.ok(fs.existsSync(path.join(target, 'sagecut', 'schedule.json')));
-  assert.ok(!fs.existsSync(path.join(here, 'sagecut')));
+  assert.ok(fs.existsSync(path.join(target, 'clefcut', 'schedule.json')));
+  assert.ok(!fs.existsSync(path.join(here, 'clefcut')));
   fs.rmSync(target, { recursive: true, force: true }); fs.rmSync(here, { recursive: true, force: true });
 });
 
 test('init: the schedule skeleton ends on the last frame, not one past it', async () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-init-'));
   await capture(() => init.run(['--frames', '300'], { root: d, config: loadConfig(d) }));
-  const s = JSON.parse(fs.readFileSync(path.join(d, 'sagecut', 'schedule.json'), 'utf8'));
+  const s = JSON.parse(fs.readFileSync(path.join(d, 'clefcut', 'schedule.json'), 'utf8'));
   assert.equal(s.beats[0].end, 299);
   assert.equal(s.beats[0].elements[0].out, 299);
   assert.deepEqual(validateSchedule(s), []);

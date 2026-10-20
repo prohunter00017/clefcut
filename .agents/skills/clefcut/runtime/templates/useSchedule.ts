@@ -1,9 +1,9 @@
-// Written by SageCut (sagecut init). The single source of timing: sagecut/schedule.json.
-// Your composition and SageCut read the same file, so the video and the QA never disagree.
+// Written by ClefCut (clefcut init). The single source of timing: clefcut/schedule.json.
+// Your composition and ClefCut read the same file, so the video and the QA never disagree.
 // Needs "resolveJsonModule": true in tsconfig.json.
 import React from 'react';
 import { useCurrentFrame } from 'remotion';
-import schedule from '../../sagecut/schedule.json';
+import schedule from '../../clefcut/schedule.json';
 
 export type ScheduleElement = { id: string; in: number; out?: number; text?: string; literal?: boolean };
 export type ScheduleBeat = { id: string; start: number; end: number; hold?: number | [number, number]; elements?: ScheduleElement[]; order?: number };
@@ -16,7 +16,7 @@ export const SCHEDULE = schedule as unknown as Schedule;
 
 const findBeat = (id: string): ScheduleBeat => {
   const beat = SCHEDULE.beats.find((b) => b.id === id);
-  if (!beat) throw new Error(`SageCut: no beat "${id}" in sagecut/schedule.json`);
+  if (!beat) throw new Error(`ClefCut: no beat "${id}" in clefcut/schedule.json`);
   return beat;
 };
 
@@ -43,7 +43,7 @@ export const Scheduled: React.FC<{ id: string; children?: React.ReactNode }> = (
       return frame >= el.in && frame <= out ? React.createElement(React.Fragment, null, children) : null;
     }
   }
-  throw new Error(`SageCut: no element "${id}" in sagecut/schedule.json`);
+  throw new Error(`ClefCut: no element "${id}" in clefcut/schedule.json`);
 };
 
 // The text that the schedule declares for an element (so the copy lives in one place).
@@ -52,5 +52,5 @@ export const scheduledText = (id: string): string => {
     const el = (beat.elements || []).find((e) => e.id === id);
     if (el) return el.text ?? '';
   }
-  throw new Error(`SageCut: no element "${id}" in sagecut/schedule.json`);
+  throw new Error(`ClefCut: no element "${id}" in clefcut/schedule.json`);
 };

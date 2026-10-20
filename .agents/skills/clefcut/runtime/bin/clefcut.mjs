@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { createRequire as __sagecutCreateRequire } from 'node:module';
-const require = __sagecutCreateRequire(import.meta.url);
-import { fileURLToPath as __sagecutFtu } from 'node:url';
-import { dirname as __sagecutDirname } from 'node:path';
-const __filename = __sagecutFtu(import.meta.url);
-const __dirname = __sagecutDirname(__filename);
+import { createRequire as __clefcutCreateRequire } from 'node:module';
+const require = __clefcutCreateRequire(import.meta.url);
+import { fileURLToPath as __clefcutFtu } from 'node:url';
+import { dirname as __clefcutDirname } from 'node:path';
+const __filename = __clefcutFtu(import.meta.url);
+const __dirname = __clefcutDirname(__filename);
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -122,17 +122,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path32) {
-      const ctrl = callVisitor(key, node, visitor, path32);
+    function visit_(key, node, visitor, path33) {
+      const ctrl = callVisitor(key, node, visitor, path33);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path32, ctrl);
-        return visit_(key, ctrl, visitor, path32);
+        replaceNode(key, path33, ctrl);
+        return visit_(key, ctrl, visitor, path33);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path32 = Object.freeze(path32.concat(node));
+          path33 = Object.freeze(path33.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path32);
+            const ci = visit_(i, node.items[i], visitor, path33);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -143,13 +143,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path32 = Object.freeze(path32.concat(node));
-          const ck = visit_("key", node.key, visitor, path32);
+          path33 = Object.freeze(path33.concat(node));
+          const ck = visit_("key", node.key, visitor, path33);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path32);
+          const cv = visit_("value", node.value, visitor, path33);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -170,17 +170,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path32) {
-      const ctrl = await callVisitor(key, node, visitor, path32);
+    async function visitAsync_(key, node, visitor, path33) {
+      const ctrl = await callVisitor(key, node, visitor, path33);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path32, ctrl);
-        return visitAsync_(key, ctrl, visitor, path32);
+        replaceNode(key, path33, ctrl);
+        return visitAsync_(key, ctrl, visitor, path33);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path32 = Object.freeze(path32.concat(node));
+          path33 = Object.freeze(path33.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path32);
+            const ci = await visitAsync_(i, node.items[i], visitor, path33);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -191,13 +191,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path32 = Object.freeze(path32.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path32);
+          path33 = Object.freeze(path33.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path33);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path32);
+          const cv = await visitAsync_("value", node.value, visitor, path33);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -224,23 +224,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path32) {
+    function callVisitor(key, node, visitor, path33) {
       if (typeof visitor === "function")
-        return visitor(key, node, path32);
+        return visitor(key, node, path33);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path32);
+        return visitor.Map?.(key, node, path33);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path32);
+        return visitor.Seq?.(key, node, path33);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path32);
+        return visitor.Pair?.(key, node, path33);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path32);
+        return visitor.Scalar?.(key, node, path33);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path32);
+        return visitor.Alias?.(key, node, path33);
       return void 0;
     }
-    function replaceNode(key, path32, node) {
-      const parent = path32[path32.length - 1];
+    function replaceNode(key, path33, node) {
+      const parent = path33[path33.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -852,10 +852,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path32, value) {
+    function collectionFromPath(schema, path33, value) {
       let v = value;
-      for (let i = path32.length - 1; i >= 0; --i) {
-        const k = path32[i];
+      for (let i = path33.length - 1; i >= 0; --i) {
+        const k = path33[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -874,7 +874,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path32) => path32 == null || typeof path32 === "object" && !!path32[Symbol.iterator]().next().done;
+    var isEmptyPath = (path33) => path33 == null || typeof path33 === "object" && !!path33[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -904,11 +904,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path32, value) {
-        if (isEmptyPath(path32))
+      addIn(path33, value) {
+        if (isEmptyPath(path33))
           this.add(value);
         else {
-          const [key, ...rest] = path32;
+          const [key, ...rest] = path33;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -922,8 +922,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path32) {
-        const [key, ...rest] = path32;
+      deleteIn(path33) {
+        const [key, ...rest] = path33;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -937,8 +937,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path32, keepScalar) {
-        const [key, ...rest] = path32;
+      getIn(path33, keepScalar) {
+        const [key, ...rest] = path33;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -956,8 +956,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path32) {
-        const [key, ...rest] = path32;
+      hasIn(path33) {
+        const [key, ...rest] = path33;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -967,8 +967,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path32, value) {
-        const [key, ...rest] = path32;
+      setIn(path33, value) {
+        const [key, ...rest] = path33;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3483,9 +3483,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path32, value) {
+      addIn(path33, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path32, value);
+          this.contents.addIn(path33, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3560,14 +3560,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path32) {
-        if (Collection.isEmptyPath(path32)) {
+      deleteIn(path33) {
+        if (Collection.isEmptyPath(path33)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path32) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path33) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3582,10 +3582,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path32, keepScalar) {
-        if (Collection.isEmptyPath(path32))
+      getIn(path33, keepScalar) {
+        if (Collection.isEmptyPath(path33))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path32, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path33, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3596,10 +3596,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path32) {
-        if (Collection.isEmptyPath(path32))
+      hasIn(path33) {
+        if (Collection.isEmptyPath(path33))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path32) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path33) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3616,13 +3616,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path32, value) {
-        if (Collection.isEmptyPath(path32)) {
+      setIn(path33, value) {
+        if (Collection.isEmptyPath(path33)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path32), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path33), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path32, value);
+          this.contents.setIn(path33, value);
         }
       }
       /**
@@ -5583,9 +5583,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path32) => {
+    visit.itemAtPath = (cst, path33) => {
       let item = cst;
-      for (const [field, index] of path32) {
+      for (const [field, index] of path33) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5594,23 +5594,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path32) => {
-      const parent = visit.itemAtPath(cst, path32.slice(0, -1));
-      const field = path32[path32.length - 1][0];
+    visit.parentCollection = (cst, path33) => {
+      const parent = visit.itemAtPath(cst, path33.slice(0, -1));
+      const field = path33[path33.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path32, item, visitor) {
-      let ctrl = visitor(item, path32);
+    function _visit(path33, item, visitor) {
+      let ctrl = visitor(item, path33);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path32.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path33.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5621,10 +5621,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path32);
+            ctrl = ctrl(item, path33);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path32) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path33) : ctrl;
     }
     exports.visit = visit;
   }
@@ -6926,14 +6926,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs35 = this.flowScalar(this.type);
+              const fs36 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs35, sep: [] });
+                map.items.push({ start, key: fs36, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs35);
+                this.stack.push(fs36);
               } else {
-                Object.assign(it, { key: fs35, sep: [] });
+                Object.assign(it, { key: fs36, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7061,13 +7061,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs35 = this.flowScalar(this.type);
+              const fs36 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs35, sep: [] });
+                fc.items.push({ start: [], key: fs36, sep: [] });
               else if (it.sep)
-                this.stack.push(fs35);
+                this.stack.push(fs36);
               else
-                Object.assign(it, { key: fs35, sep: [] });
+                Object.assign(it, { key: fs36, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -8086,11 +8086,11 @@ var require_defaultOptions = __commonJS({
 var require_defaultOptions2 = __commonJS({
   "node_modules/tesseract.js/src/worker/node/defaultOptions.js"(exports, module) {
     "use strict";
-    var path32 = __require("path");
+    var path33 = __require("path");
     var defaultOptions = require_defaultOptions();
     module.exports = {
       ...defaultOptions,
-      workerPath: path32.join(__dirname, "..", "..", "worker-script", "node", "index.js")
+      workerPath: path33.join(__dirname, "..", "..", "worker-script", "node", "index.js")
     };
   }
 });
@@ -8866,14 +8866,14 @@ var require_url_state_machine = __commonJS({
       return url.replace(/\u0009|\u000A|\u000D/g, "");
     }
     function shortenPath(url) {
-      const path32 = url.path;
-      if (path32.length === 0) {
+      const path33 = url.path;
+      if (path33.length === 0) {
         return;
       }
-      if (url.scheme === "file" && path32.length === 1 && isNormalizedWindowsDriveLetter(path32[0])) {
+      if (url.scheme === "file" && path33.length === 1 && isNormalizedWindowsDriveLetter(path33[0])) {
         return;
       }
-      path32.pop();
+      path33.pop();
     }
     function includesCredentials(url) {
       return url.username !== "" || url.password !== "";
@@ -11174,10 +11174,10 @@ var require_loadImage = __commonJS({
   "node_modules/tesseract.js/src/worker/node/loadImage.js"(exports, module) {
     "use strict";
     var util = __require("util");
-    var fs35 = __require("fs");
+    var fs36 = __require("fs");
     var fetch2 = global.fetch || require_lib2();
     var isURL = require_is_url();
-    var readFile = util.promisify(fs35.readFile);
+    var readFile = util.promisify(fs36.readFile);
     module.exports = async (image) => {
       let data = image;
       if (typeof image === "undefined") {
@@ -11283,20 +11283,20 @@ var require_createWorker = __commonJS({
         action: "load",
         payload: { options: { lstmOnly: lstmOnlyCore, corePath: options.corePath, logging: options.logging } }
       }));
-      const writeText = (path32, text, jobId) => startJob(createJob({
+      const writeText = (path33, text, jobId) => startJob(createJob({
         id: jobId,
         action: "FS",
-        payload: { method: "writeFile", args: [path32, text] }
+        payload: { method: "writeFile", args: [path33, text] }
       }));
-      const readText = (path32, jobId) => startJob(createJob({
+      const readText = (path33, jobId) => startJob(createJob({
         id: jobId,
         action: "FS",
-        payload: { method: "readFile", args: [path32, { encoding: "utf8" }] }
+        payload: { method: "readFile", args: [path33, { encoding: "utf8" }] }
       }));
-      const removeFile = (path32, jobId) => startJob(createJob({
+      const removeFile = (path33, jobId) => startJob(createJob({
         id: jobId,
         action: "FS",
-        payload: { method: "unlink", args: [path32] }
+        payload: { method: "unlink", args: [path33] }
       }));
       const FS = (method, args, jobId) => startJob(createJob({
         id: jobId,
@@ -11598,6 +11598,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 function pluginRoot() {
+  if (process.env.CLEFCUT_ROOT) return process.env.CLEFCUT_ROOT;
   if (process.env.CLAUDE_PLUGIN_ROOT) return process.env.CLAUDE_PLUGIN_ROOT;
   let dir = path.dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 5; i++) {
@@ -11610,7 +11611,7 @@ function findProjectRoot(start = process.cwd()) {
   let dir = path.resolve(start);
   let remotionDir = null;
   for (; ; ) {
-    if (fs.existsSync(path.join(dir, "sagecut", "sagecut.yaml"))) return dir;
+    if (fs.existsSync(path.join(dir, "clefcut", "clefcut.yaml"))) return dir;
     const pj = path.join(dir, "package.json");
     if (!remotionDir && fs.existsSync(pj)) {
       try {
@@ -11625,11 +11626,11 @@ function findProjectRoot(start = process.cwd()) {
     dir = up;
   }
 }
-var sagecutDir = (root) => path.join(root, "sagecut");
-var qaDir = (root) => path.join(root, "sagecut", "qa");
-var metricsDir = (root) => path.join(root, "sagecut", "metrics");
+var clefcutDir = (root) => path.join(root, "clefcut");
+var qaDir = (root) => path.join(root, "clefcut", "qa");
+var metricsDir = (root) => path.join(root, "clefcut", "metrics");
 function userDataDir() {
-  return process.env.SAGECUT_HOME || path.join(os.homedir(), ".sagecut");
+  return process.env.CLEFCUT_HOME || path.join(os.homedir(), ".clefcut");
 }
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -11650,17 +11651,18 @@ var import_yaml = __toESM(require_dist(), 1);
 import fs2 from "node:fs";
 import path2 from "node:path";
 var DEFAULTS = {
-  schedule: "sagecut/schedule.json",
-  brand: "sagecut/brand.yaml",
+  schedule: "clefcut/schedule.json",
+  brand: "clefcut/brand.yaml",
   workers: 4,
   test_width: null,
   question_bank: null,
+  sweep_bank: null,
   composition: null,
   audio: "auto"
 };
 var TEST_WIDTH = { "16:9": 350, "9:16": 210, "1:1": 375 };
 function loadConfig(root) {
-  const file = path2.join(sagecutDir(root), "sagecut.yaml");
+  const file = path2.join(clefcutDir(root), "clefcut.yaml");
   let cfg = {};
   if (fs2.existsSync(file)) cfg = import_yaml.default.parse(fs2.readFileSync(file, "utf8")) || {};
   const out = { ...DEFAULTS, ...cfg, root, file };
@@ -11673,7 +11675,7 @@ function loadConfig(root) {
 }
 
 // src/core/version.mjs
-var VERSION = "0.3.0";
+var VERSION = "0.4.0";
 
 // src/commands/doctor.mjs
 var doctor_exports = {};
@@ -11728,8 +11730,8 @@ var cached = null;
 function locate(projectRoot = process.cwd()) {
   if (cached && cached.root === projectRoot) return cached.tools;
   let tools = null;
-  if (process.env.SAGECUT_FFMPEG && process.env.SAGECUT_FFPROBE) {
-    tools = { ffmpeg: process.env.SAGECUT_FFMPEG, ffprobe: process.env.SAGECUT_FFPROBE, env: { ...process.env }, source: "env" };
+  if (process.env.CLEFCUT_FFMPEG && process.env.CLEFCUT_FFPROBE) {
+    tools = { ffmpeg: process.env.CLEFCUT_FFMPEG, ffprobe: process.env.CLEFCUT_FFPROBE, env: { ...process.env }, source: "env" };
   }
   if (!tools) {
     const dir = findCompositorDir(projectRoot);
@@ -11757,7 +11759,7 @@ function run(bin, args, { root = process.cwd(), input = null } = {}) {
       err += d.toString();
       if (err.length > 2e6) err = err.slice(-1e6);
     });
-    p.on("error", (e) => reject(new Error(`${bin} could not start (${exe}): ${e.message}. Run "sagecut doctor".`)));
+    p.on("error", (e) => reject(new Error(`${bin} could not start (${exe}): ${e.message}. Run "clefcut doctor".`)));
     p.on("close", (code) => resolve({ code, stdout: Buffer.concat(out), stderr: err }));
     if (input) {
       p.stdin.write(input);
@@ -11825,7 +11827,7 @@ async function* frames(video, { root = process.cwd(), width, height, gray = true
     if (p.exitCode === null) p.kill();
   }
   const code = await new Promise((r) => failed || p.exitCode !== null ? r(p.exitCode) : (p.once("close", r), p.once("error", () => r(null))));
-  if (failed) throw new Error(`ffmpeg could not start (${t.ffmpeg}): ${failed.message}. Run "sagecut doctor".`);
+  if (failed) throw new Error(`ffmpeg could not start (${t.ffmpeg}): ${failed.message}. Run "clefcut doctor".`);
   if (code !== 0 && code !== null && index === start) throw new Error(`ffmpeg decode failed: ${err.trim().slice(0, 300)}`);
 }
 var IMAGE_FILE = /\.(png|jpe?g|webp|bmp|tiff?)$/i;
@@ -12008,7 +12010,7 @@ function estimateGroup(model, g) {
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 var fatal = (message, status2) => Object.assign(new Error(message), { fatal: true, status: status2 });
 var ClefClient = class {
-  constructor({ root = process.cwd(), workers = 4, tag = "sagecut", timeoutMs = 9e4 } = {}) {
+  constructor({ root = process.cwd(), workers = 4, tag = "clefcut", timeoutMs = 9e4 } = {}) {
     const env = loadClefEnv(root);
     this.root = root;
     this.workers = Math.max(1, Math.trunc(workers) || 4);
@@ -12021,12 +12023,12 @@ var ClefClient = class {
   }
   // Commands call this first: it fails with the fix when the key or the model is wrong.
   check() {
-    if (!this.account || !this.token) throw fatal('No Cloudflare key. Put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env file or ~/.sagecut/.env (run "sagecut doctor").');
+    if (!this.account || !this.token) throw fatal('No Cloudflare key. Put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env file or ~/.clefcut/.env (run "clefcut doctor").');
     if (CLEF_INPUT_USD[this.model] == null) throw fatal(`CLEF_MODEL "${this.model}" is not a Clef model. Use one of: ${Object.keys(CLEF_INPUT_USD).join(", ")}.`);
   }
   async post(body, tries = 5) {
     this.check();
-    const headers = { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json", "User-Agent": `sagecut/${VERSION}` };
+    const headers = { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json", "User-Agent": `clefcut/${VERSION}` };
     const payload = JSON.stringify(body);
     for (let n = 0; n < tries; n++) {
       let r;
@@ -12057,7 +12059,7 @@ var ClefClient = class {
   // There is no health route: ask one tiny question, which also checks the key.
   async ready() {
     try {
-      await this.post({ model: this.model, state: "SageCut doctor check", questions: { q: { type: "noul", instructions: "Is this text a test?" } } }, 1);
+      await this.post({ model: this.model, state: "ClefCut doctor check", questions: { q: { type: "noul", instructions: "Is this text a test?" } } }, 1);
       return { ok: true, status: 200 };
     } catch (e) {
       return { ok: false, status: e.status || 0, error: e.message };
@@ -12199,7 +12201,7 @@ function validateBrand(b) {
 }
 function loadBrand(file, { required = false } = {}) {
   if (!fs7.existsSync(file)) {
-    if (required) throw new Error(`No brand file at ${file}. Run "sagecut brand" (or /sagecut:start).`);
+    if (required) throw new Error(`No brand file at ${file}. Run "clefcut brand" (or /clefcut:start).`);
     return null;
   }
   const b = import_yaml2.default.parse(fs7.readFileSync(file, "utf8"));
@@ -12302,10 +12304,10 @@ async function checks(ctx) {
     if (v.code === 0 && p.code === 0) {
       const ver = (v.stdout.toString().match(/ffmpeg version (\S+)/) || [])[1] || "?";
       if (t.source.startsWith("remotion:")) add("ffmpeg", "pass", `ffmpeg ${ver} and ffprobe (source: ${t.source})`);
-      else add("ffmpeg", "warn", `ffmpeg ${ver} and ffprobe (source: ${t.source})`, "using a system ffmpeg; in your Remotion project run npm install so SageCut uses Remotion's bundled ffmpeg");
-    } else add("ffmpeg", "fail", "ffmpeg or ffprobe did not run", 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set SAGECUT_FFMPEG and SAGECUT_FFPROBE.');
+      else add("ffmpeg", "warn", `ffmpeg ${ver} and ffprobe (source: ${t.source})`, "using a system ffmpeg; in your Remotion project run npm install so ClefCut uses Remotion's bundled ffmpeg");
+    } else add("ffmpeg", "fail", "ffmpeg or ffprobe did not run", 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set CLEFCUT_FFMPEG and CLEFCUT_FFPROBE.');
   } catch (e) {
-    add("ffmpeg", "fail", e.message.split("\n")[0], 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set SAGECUT_FFMPEG and SAGECUT_FFPROBE.');
+    add("ffmpeg", "fail", e.message.split("\n")[0], 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set CLEFCUT_FFMPEG and CLEFCUT_FFPROBE.');
   }
   await clefChecks(root, add);
   try {
@@ -12320,23 +12322,23 @@ async function checks(ctx) {
       const b = loadBrand(ctx.config.brandPath);
       add("brand", "pass", `brand "${b.name}" (${ctx.config.brand})`);
     } catch (e) {
-      add("brand", "fail", e.message, 'Fix the listed fields, then run "sagecut brand set sagecut/brand.yaml".');
+      add("brand", "fail", e.message, 'Fix the listed fields, then run "clefcut brand set clefcut/brand.yaml".');
     }
-  } else add("brand", "warn", `no brand file at ${ctx.config.brand}`, 'Run /sagecut:start, or "sagecut brand from-url <URL>".');
+  } else add("brand", "warn", `no brand file at ${ctx.config.brand}`, 'Run "clefcut brand from-url <URL>" (or /clefcut:start in the Claude Code plugin).');
   if (fs9.existsSync(ctx.config.schedulePath)) {
     try {
       const errs = validateSchedule(JSON.parse(fs9.readFileSync(ctx.config.schedulePath, "utf8")));
-      if (errs.length) add("schedule", "fail", `${errs.length} error(s): ${errs[0]}`, 'Run "sagecut check-schedule" for the full list.');
+      if (errs.length) add("schedule", "fail", `${errs.length} error(s): ${errs[0]}`, 'Run "clefcut check-schedule" for the full list.');
       else add("schedule", "pass", ctx.config.schedule);
     } catch (e) {
       add("schedule", "fail", e.message, "Fix the JSON in the schedule file.");
     }
-  } else add("schedule", "warn", `no schedule at ${ctx.config.schedule}`, 'Run "sagecut init".');
+  } else add("schedule", "warn", `no schedule at ${ctx.config.schedule}`, 'Run "clefcut init".');
   return out;
 }
 async function clefChecks(root, add) {
   const env = loadClefEnv(root), model = `@cf/cloudflare/${env.model}`;
-  const fix = `Make an API token with the Workers AI permission at ${KEY_PAGE}, then put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env or ~/.sagecut/.env.`;
+  const fix = `Make an API token with the Workers AI permission at ${KEY_PAGE}, then put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env or ~/.clefcut/.env.`;
   if (env.hasKey) add("clef key", "pass", `CLOUDFLARE_ACCOUNT_ID (${maskKey(env.account)}) and CLOUDFLARE_API_TOKEN (${maskKey(env.token)}) present, model ${env.model}`);
   else {
     add("clef key", "fail", "CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN not found", fix);
@@ -12354,7 +12356,7 @@ async function clefChecks(root, add) {
 async function run2(argv, ctx) {
   const { values } = parseArgs({ args: argv, options: { json: { type: "boolean" }, root: { type: "string" }, help: { type: "boolean" } } });
   if (values.help) {
-    console.log("usage: sagecut doctor [--json]");
+    console.log("usage: clefcut doctor [--json]");
     return 0;
   }
   const results = await checks(ctx);
@@ -12363,7 +12365,7 @@ async function run2(argv, ctx) {
     console.log(JSON.stringify({ version: VERSION, ok: !failed, checks: results }, null, 1));
     return failed ? 1 : 0;
   }
-  console.log(`sagecut ${VERSION} doctor (project: ${ctx.root})`);
+  console.log(`clefcut ${VERSION} doctor (project: ${ctx.root})`);
   const mark = { pass: "PASS", fail: "FAIL", warn: "WARN" };
   for (const r of results) {
     console.log(`${mark[r.status]}  ${r.name.padEnd(12)} ${r.detail}`);
@@ -12382,13 +12384,13 @@ import fs10 from "node:fs";
 import path8 from "node:path";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 import { parseArgs as parseArgs2 } from "node:util";
-var help2 = "add sagecut/, the schedule skeleton and src/sagecut/useSchedule.ts to a Remotion project";
+var help2 = "add clefcut/, the schedule skeleton and src/clefcut/useSchedule.ts to a Remotion project";
 function templateDir() {
   const here = path8.dirname(fileURLToPath3(import.meta.url));
   for (const d of [path8.join(pluginRoot(), "templates"), path8.join(here, "..", "templates"), path8.join(here, "..", "..", "templates")]) {
     if (fs10.existsSync(path8.join(d, "useSchedule.ts"))) return d;
   }
-  throw new Error("SageCut templates not found. Reinstall the plugin.");
+  throw new Error("ClefCut templates not found. Reinstall the plugin.");
 }
 async function run3(argv, ctx) {
   const { values } = parseArgs2({ args: argv, options: {
@@ -12401,7 +12403,7 @@ async function run3(argv, ctx) {
     help: { type: "boolean" }
   } });
   if (values.help) {
-    say("usage: sagecut init [--composition ID] [--fps N --frames N --width W --height H]");
+    say("usage: clefcut init [--composition ID] [--fps N --frames N --width W --height H]");
     return 0;
   }
   const root = ctx.root;
@@ -12424,10 +12426,10 @@ async function run3(argv, ctx) {
   const fps = num3(values.fps, 30), frames2 = num3(values.frames, 300), width = num3(values.width, 1920), height = num3(values.height, 1080);
   const composition = values.composition || "Main";
   writeNew(
-    path8.join(sagecutDir(root), "sagecut.yaml"),
-    fs10.readFileSync(path8.join(tpl, "sagecut.yaml"), "utf8").replace("__COMPOSITION__", composition).replace(/^# composition: .*$/m, `composition: ${composition}`)
+    path8.join(clefcutDir(root), "clefcut.yaml"),
+    fs10.readFileSync(path8.join(tpl, "clefcut.yaml"), "utf8").replace("__COMPOSITION__", composition).replace(/^# composition: .*$/m, `composition: ${composition}`)
   );
-  writeNew(path8.join(sagecutDir(root), "schedule.json"), JSON.stringify({
+  writeNew(path8.join(clefcutDir(root), "schedule.json"), JSON.stringify({
     film: composition,
     fps,
     frames: frames2,
@@ -12440,11 +12442,11 @@ async function run3(argv, ctx) {
     effects: []
   }, null, 2) + "\n");
   ensureDir(metricsDir(root));
-  writeNew(path8.join(root, "src", "sagecut", "useSchedule.ts"), fs10.readFileSync(path8.join(tpl, "useSchedule.ts"), "utf8"));
+  writeNew(path8.join(root, "src", "clefcut", "useSchedule.ts"), fs10.readFileSync(path8.join(tpl, "useSchedule.ts"), "utf8"));
   writeNew(path8.join(root, ".env.example"), fs10.readFileSync(path8.join(tpl, "env.example"), "utf8"));
   const gi = path8.join(root, ".gitignore");
   const have = fs10.existsSync(gi) ? fs10.readFileSync(gi, "utf8") : "";
-  const want = [".env", "sagecut/qa/*/raw/"].filter((l) => !have.split(/\r?\n/).some((x) => x.trim() === l));
+  const want = [".env", "clefcut/qa/*/raw/"].filter((l) => !have.split(/\r?\n/).some((x) => x.trim() === l));
   if (want.length) {
     fs10.writeFileSync(gi, have + (have && !have.endsWith("\n") ? "\n" : "") + want.join("\n") + "\n");
     created.push(`.gitignore (+${want.join(", ")})`);
@@ -12454,7 +12456,7 @@ ${created.map((x) => `  ${x}`).join("\n")}`);
   if (kept.length) say(`Kept (already there):
 ${kept.map((x) => `  ${x}`).join("\n")}`);
   say('The schedule has a "_help" line that explains element role, effects and static_holds. Delete it when you no longer need it.');
-  say('Next: set "resolveJsonModule": true in tsconfig.json, edit sagecut/schedule.json, and import { useBeat, Scheduled } from "./sagecut/useSchedule" in your composition.');
+  say('Next: set "resolveJsonModule": true in tsconfig.json, edit clefcut/schedule.json, and import { useBeat, Scheduled } from "./clefcut/useSchedule" in your composition.');
   return 0;
 }
 
@@ -12785,7 +12787,7 @@ function pickFontSource(faces, family) {
 }
 
 // src/brand/fromurl.mjs
-var UA = `Mozilla/5.0 (compatible; SageCut/${VERSION}; +https://github.com/levantolabs/sagecut)`;
+var UA = `Mozilla/5.0 (compatible; ClefCut/${VERSION}; +https://github.com/prohunter00017/clefcut)`;
 var CAP_BYTES = 5 * 1024 * 1024;
 var MAX_CSS = 10;
 async function fetchLimited(url, budget, { binary = false, ua = UA, timeoutMs = 2e4 } = {}) {
@@ -12934,7 +12936,7 @@ async function brandFromUrl(urlStr, { root, log = () => {
   }
   const name = siteName(html, u);
   const cands = findLogos(html, base);
-  const assetsDir = path9.join(root, "sagecut", "brand-assets");
+  const assetsDir = path9.join(root, "clefcut", "brand-assets");
   const logoFiles = [];
   const logoNotes = [];
   for (const c of cands.slice(0, 4)) {
@@ -13176,7 +13178,7 @@ function brandFromFolder(dirArg, { root }) {
   }
   if (!fonts.heading && !fonts.body) notes.push("no fonts found");
   logos.sort((a, b) => b.score - a.score);
-  const assetsDir = path10.join(root, "sagecut", "brand-assets");
+  const assetsDir = path10.join(root, "clefcut", "brand-assets");
   const logoFiles = [];
   for (const l of logos.slice(0, 2)) {
     fs12.mkdirSync(assetsDir, { recursive: true });
@@ -13317,7 +13319,7 @@ function brandTs(brand, logoPublic) {
     }
   }
   const c = brand.colors;
-  return `// Written by SageCut from sagecut/brand.yaml. Do not edit by hand: edit the brand file, then run "sagecut brand set sagecut/brand.yaml".
+  return `// Written by ClefCut from clefcut/brand.yaml. Do not edit by hand: edit the brand file, then run "clefcut brand set clefcut/brand.yaml".
 // Needs @remotion/fonts in the project: npx remotion add @remotion/fonts
 import { staticFile } from 'remotion';
 import { loadFont } from '@remotion/fonts';
@@ -13390,25 +13392,25 @@ async function setBrand(file, { root, log = console.log }) {
   const msgs = [...await installFonts(brand, { root, brandDir })];
   const logos = installLogos(brand, { root, brandDir });
   msgs.push(...logos.msgs);
-  const dest = path11.join(sagecutDir(root), "brand.yaml");
+  const dest = path11.join(clefcutDir(root), "brand.yaml");
   ensureDir(path11.dirname(dest));
   fs13.writeFileSync(dest, import_yaml3.default.stringify(brand));
   ensureDir(path11.join(root, "src"));
   fs13.writeFileSync(path11.join(root, "src", "brand.ts"), brandTs(brand, logos.public));
   const saved = saveBrand(brand, { root, brandDir });
-  msgs.push(`wrote sagecut/brand.yaml, src/brand.ts and ${saved}`);
+  msgs.push(`wrote clefcut/brand.yaml, src/brand.ts and ${saved}`);
   for (const m of msgs) log(m);
   return { brand, messages: msgs, saved };
 }
 
 // src/commands/brand.mjs
 var help3 = "make or load the brand: from-url | from-folder | set | use | show | list";
-var USAGE = `usage: sagecut brand from-url <URL>
-       sagecut brand from-folder <PATH>
-       sagecut brand set <FILE.yaml|FILE.json>
-       sagecut brand use <NAME>
-       sagecut brand show [--json]
-       sagecut brand list [--json]`;
+var USAGE = `usage: clefcut brand from-url <URL>
+       clefcut brand from-folder <PATH>
+       clefcut brand set <FILE.yaml|FILE.json>
+       clefcut brand use <NAME>
+       clefcut brand show [--json]
+       clefcut brand list [--json]`;
 function summary(b) {
   const c = b.colors;
   const lines = [`name:       ${b.name}`, `background: ${c.background}   text: ${c.text}   primary: ${c.primary}`];
@@ -13420,7 +13422,7 @@ function summary(b) {
   return lines.join("\n");
 }
 function writeDraft(root, draft) {
-  const f = path12.join(sagecutDir(root), "brand.draft.yaml");
+  const f = path12.join(clefcutDir(root), "brand.draft.yaml");
   ensureDir(path12.dirname(f));
   fs14.writeFileSync(f, import_yaml4.default.stringify(draft));
   return f;
@@ -13435,14 +13437,14 @@ async function run4(argv, ctx) {
   const root = ctx.root;
   if (sub === "from-url") {
     if (!arg) {
-      console.error("sagecut brand from-url: give a URL. Example: sagecut brand from-url https://example.com");
+      console.error("clefcut brand from-url: give a URL. Example: clefcut brand from-url https://example.com");
       return 2;
     }
     const r = await brandFromUrl(arg, { root });
     for (const w of r.warnings) console.error(`note: ${w}`);
     if (!r.found.colours && !r.found.fonts && !r.found.logos) {
       console.log(`Found no colours, fonts or logo on ${arg}. The page may build its styles with JavaScript.`);
-      console.log('Use "sagecut brand from-folder <PATH>" with a brand kit folder, or answer the brand questions in /sagecut:start.');
+      console.log('Use "clefcut brand from-folder <PATH>" with a brand kit folder, or answer the brand questions in /clefcut:start.');
       return 1;
     }
     const f = writeDraft(root, r.draft);
@@ -13453,19 +13455,19 @@ Coverage: colours ${r.found.colours ? "found" : "none"}, fonts ${r.found.fonts ?
     if (!r.cssFiles) console.log("No stylesheet is linked from the page. Styles built by JavaScript are not read.");
     console.log("This reads static HTML and CSS only. Styles built by JavaScript are not read. A website gives no video format, so check the format yourself.");
     console.log(`Draft: ${path12.relative(root, f)}  (${r.cssFiles} CSS file(s), ${(r.bytes / 1024).toFixed(0)} KB read)`);
-    console.log('Confirm that you have the right to use these files before you use this brand. Then run "sagecut brand set sagecut/brand.draft.yaml".');
+    console.log('Confirm that you have the right to use these files before you use this brand. Then run "clefcut brand set clefcut/brand.draft.yaml".');
     return 0;
   }
   if (sub === "from-folder") {
     if (!arg) {
-      console.error("sagecut brand from-folder: give a folder path.");
+      console.error("clefcut brand from-folder: give a folder path.");
       return 2;
     }
     const r = brandFromFolder(arg, { root });
     for (const w of r.warnings) console.error(`note: ${w}`);
     if (!r.found.colours && !r.found.fonts && !r.found.logos) {
       console.log(`Found no colours, fonts or logo in ${arg} (${r.found.files} files read).`);
-      console.log("Answer the brand questions in /sagecut:start instead, or point to a folder with logo, font, CSS or guide files.");
+      console.log("Answer the brand questions in /clefcut:start instead, or point to a folder with logo, font, CSS or guide files.");
       return 1;
     }
     const f = writeDraft(root, r.draft);
@@ -13473,36 +13475,36 @@ Coverage: colours ${r.found.colours ? "found" : "none"}, fonts ${r.found.fonts ?
     r.notes.forEach((n) => console.log(`read: ${n}`));
     console.log(`
 Draft: ${path12.relative(root, f)}`);
-    console.log('Confirm that you have the right to use these files before you use this brand. Then run "sagecut brand set sagecut/brand.draft.yaml".');
+    console.log('Confirm that you have the right to use these files before you use this brand. Then run "clefcut brand set clefcut/brand.draft.yaml".');
     return 0;
   }
   if (sub === "set") {
     if (!arg) {
-      console.error("sagecut brand set: give a brand file (.yaml or .json).");
+      console.error("clefcut brand set: give a brand file (.yaml or .json).");
       return 2;
     }
     try {
       await setBrand(path12.resolve(arg), { root, log: (m) => say(m) });
     } catch (e) {
-      console.error(`sagecut: ${e.message}`);
+      console.error(`clefcut: ${e.message}`);
       return e.errors ? 1 : 2;
     }
     return 0;
   }
   if (sub === "use") {
     if (!arg) {
-      console.error('sagecut brand use: give a saved brand name. See "sagecut brand list".');
+      console.error('clefcut brand use: give a saved brand name. See "clefcut brand list".');
       return 2;
     }
     const f = path12.join(userDataDir(), "brands", `${slug(arg)}.yaml`);
     if (!fs14.existsSync(f)) {
-      console.error(`No saved brand "${arg}" in ${path12.dirname(f)}. See "sagecut brand list".`);
+      console.error(`No saved brand "${arg}" in ${path12.dirname(f)}. See "clefcut brand list".`);
       return 2;
     }
     try {
       await setBrand(f, { root, log: (m) => say(m) });
     } catch (e) {
-      console.error(`sagecut: ${e.message}`);
+      console.error(`clefcut: ${e.message}`);
       return 2;
     }
     return 0;
@@ -13510,7 +13512,7 @@ Draft: ${path12.relative(root, f)}`);
   if (sub === "show") {
     const b = loadBrand(ctx.config.brandPath);
     if (!b) {
-      console.error('No brand file yet. Run /sagecut:start or "sagecut brand from-url <URL>".');
+      console.error('No brand file yet. Run /clefcut:start or "clefcut brand from-url <URL>".');
       return 1;
     }
     say(values.json ? JSON.stringify(b, null, 1) : summary(b));
@@ -13523,7 +13525,7 @@ Draft: ${path12.relative(root, f)}`);
     else say(names.length ? names.join("\n") : "No saved brands yet.");
     return 0;
   }
-  console.error(`sagecut brand: unknown "${sub}".
+  console.error(`clefcut brand: unknown "${sub}".
 ${USAGE}`);
   return 2;
 }
@@ -13575,12 +13577,12 @@ function copyFindings(schedule, brand) {
 async function run5(argv, ctx) {
   const { values } = parseArgs4({ args: argv, options: { video: { type: "string" }, json: { type: "boolean" }, root: { type: "string" }, help: { type: "boolean" } } });
   if (values.help) {
-    say("usage: sagecut check-schedule [--video FILE] [--json]");
+    say("usage: clefcut check-schedule [--video FILE] [--json]");
     return 0;
   }
   const file = ctx.config.schedulePath;
   if (!fs15.existsSync(file)) {
-    console.error(`No schedule at ${path13.relative(ctx.root, file)}. Run "sagecut init".`);
+    console.error(`No schedule at ${path13.relative(ctx.root, file)}. Run "clefcut init".`);
     return 2;
   }
   let raw;
@@ -15461,7 +15463,7 @@ async function writeCriticFrames(dir, video, info, picks, { root, thumbW = 320 }
 }
 
 // src/gate/pipeline.mjs
-var GATE_VERSION = `sagecut gate ${VERSION}`;
+var GATE_VERSION = `clefcut gate ${VERSION}`;
 var JPEG_OVER = 15e5;
 function effectWindows(sched) {
   const trans = (sched.transitions || []).map((t) => [t.frames[0], t.frames[1]]);
@@ -15522,7 +15524,7 @@ async function runGate(opts) {
   const skipped = [];
   if (!fs20.existsSync(video)) throw new Error(`Video not found: ${video}`);
   const schedPath = opts.schedulePath || config.schedulePath;
-  if (!fs20.existsSync(schedPath)) throw new Error(`No schedule at ${schedPath}. Run "sagecut init", or pass --schedule FILE.`);
+  if (!fs20.existsSync(schedPath)) throw new Error(`No schedule at ${schedPath}. Run "clefcut init", or pass --schedule FILE.`);
   let sched = loadSchedule(schedPath);
   const schedFrames = sched.frames;
   const brand = loadBrand(opts.brandPath || config.brandPath);
@@ -15689,7 +15691,7 @@ async function runGate(opts) {
   if (palette && palette.length) palette = [.../* @__PURE__ */ new Set([...palette, "#ffffff", "#000000"])];
   else {
     palette = null;
-    skipped.push('Brand colour check skipped: no brand file with a palette (run "sagecut brand")');
+    skipped.push('Brand colour check skipped: no brand file with a palette (run "clefcut brand")');
   }
   const plab = palette ? paletteLab(palette) : null;
   const edgeRows = [], colourSeen = /* @__PURE__ */ new Map(), clefGroups = [];
@@ -16070,13 +16072,13 @@ function summaryText(r, outDir) {
 
 // src/commands/gate.mjs
 var help5 = "measure a rendered video, ask Clef about prepared frames, select frames for the critics";
-var USAGE2 = `usage: sagecut gate <video> [--out DIR] [--json] [--no-clef] [--no-ocr] [--schedule FILE] [--bank FILE] [--max-billed N]
+var USAGE2 = `usage: clefcut gate <video> [--out DIR] [--json] [--no-clef] [--no-ocr] [--schedule FILE] [--bank FILE] [--max-billed N]
 
-  --out DIR        run folder (default sagecut/qa/gate-<stamp>)
+  --out DIR        run folder (default clefcut/qa/gate-<stamp>)
   --json           print the result as JSON on stdout (no other output)
   --no-clef        measurement only: no Clef call, no cost
   --no-ocr         skip the OCR text checks
-  --schedule FILE  schedule.json to use (default: the one in sagecut.yaml)
+  --schedule FILE  schedule.json to use (default: the one in clefcut.yaml)
   --bank FILE      question bank to use (default: the bank in the plugin)
   --max-billed N   stop before the Clef round if the estimate is above N input tokens (default 200000)`;
 async function run6(argv, ctx) {
@@ -16094,7 +16096,7 @@ async function run6(argv, ctx) {
       help: { type: "boolean", short: "h" }
     } });
   } catch (e) {
-    console.error(`sagecut gate: ${e.message}
+    console.error(`clefcut gate: ${e.message}
 ${USAGE2}`);
     return 2;
   }
@@ -16104,13 +16106,13 @@ ${USAGE2}`);
     return 0;
   }
   if (positionals.length !== 1) {
-    console.error(`sagecut gate: give one video file.
+    console.error(`clefcut gate: give one video file.
 ${USAGE2}`);
     return 2;
   }
   const maxBilled = v["max-billed"] ? Number(v["max-billed"].replace(/[,_]/g, "")) : 2e5;
   if (!Number.isFinite(maxBilled) || maxBilled <= 0) {
-    console.error("sagecut gate: --max-billed needs a number");
+    console.error("clefcut gate: --max-billed needs a number");
     return 2;
   }
   if (v.json) setQuiet(true);
@@ -16130,7 +16132,7 @@ ${USAGE2}`);
     });
     const clefErr = result.clef_errors.length, asked = result.clef_asked;
     const code = asked > 0 && clefErr === asked ? 2 : result.findings.length || result.escalations.length || clefErr ? 1 : 0;
-    if (asked > 0 && clefErr === asked) console.error(`sagecut gate: Clef returned no answer for any of the ${asked} questions (${result.clef_errors[0].error}). Check the Cloudflare key, CLEF_MODEL and the network: run "sagecut doctor". The measurements in ${outDir} stand.`);
+    if (asked > 0 && clefErr === asked) console.error(`clefcut gate: Clef returned no answer for any of the ${asked} questions (${result.clef_errors[0].error}). Check the Cloudflare key, CLEF_MODEL and the network: run "clefcut doctor". The measurements in ${outDir} stand.`);
     if (v.json) {
       process.stdout.write(JSON.stringify({
         exit: code,
@@ -16155,8 +16157,8 @@ Results: ${path19.join(outDir, "findings.json")}`);
     }
     return code;
   } catch (e) {
-    console.error(`sagecut gate: ${e.message.split("\n")[0]}`);
-    if (process.env.SAGECUT_DEBUG) console.error(e.stack);
+    console.error(`clefcut gate: ${e.message.split("\n")[0]}`);
+    if (process.env.CLEFCUT_DEBUG) console.error(e.stack);
     return 2;
   } finally {
     setQuiet(false);
@@ -16167,7 +16169,8 @@ Results: ${path19.join(outDir, "findings.json")}`);
 var sweep_exports = {};
 __export(sweep_exports, {
   help: () => help6,
-  run: () => run7
+  run: () => run7,
+  runSweep: () => runSweep
 });
 import fs24 from "node:fs";
 import path21 from "node:path";
@@ -16178,8 +16181,8 @@ import fs22 from "node:fs";
 import path20 from "node:path";
 function loadBank2(config) {
   const base = JSON.parse(fs22.readFileSync(path20.join(pluginRoot(), "assets", "bank", "sweep-default.json"), "utf8"));
-  if (!config || !config.question_bank) return base;
-  const file = path20.resolve(config.root || process.cwd(), config.question_bank);
+  if (!config || !config.sweep_bank) return base;
+  const file = path20.resolve(config.root || process.cwd(), config.sweep_bank);
   let mine;
   try {
     mine = JSON.parse(fs22.readFileSync(file, "utf8"));
@@ -16224,7 +16227,7 @@ function groupRuns(q2, frames2, gap) {
   return runs2.map((r) => ({ q: q2, frames: [r[0], r[r.length - 1]], n: r.length, list: r }));
 }
 function allRuns(flags, gap) {
-  return Object.entries(flags).flatMap(([q2, fs35]) => groupRuns(q2, fs35, gap)).sort((a, b) => a.frames[0] - b.frames[0]);
+  return Object.entries(flags).flatMap(([q2, fs36]) => groupRuns(q2, fs36, gap)).sort((a, b) => a.frames[0] - b.frames[0]);
 }
 var holdOf = (b) => Array.isArray(b.hold) ? b.hold : [b.start, b.end];
 function typedFrames(schedule) {
@@ -16291,9 +16294,9 @@ function frameStatus(rows, frames2) {
 function splitFlags(flags, why, gap) {
   const explained = {};
   const residual = [];
-  for (const [q2, fs35] of Object.entries(flags)) {
+  for (const [q2, fs36] of Object.entries(flags)) {
     const left = [];
-    for (const f of fs35) {
+    for (const f of fs36) {
       const w = why(f, q2);
       if (w) explained[w] = (explained[w] || 0) + 1;
       else left.push(f);
@@ -16407,13 +16410,13 @@ function loadContext(config) {
     try {
       schedule = loadSchedule(config.schedulePath);
     } catch (e) {
-      warn(`sagecut: schedule not used: ${e.message.split("\n")[0]}`);
+      warn(`clefcut: schedule not used: ${e.message.split("\n")[0]}`);
     }
   }
   try {
     brand = loadBrand(config.brandPath);
   } catch (e) {
-    warn(`sagecut: brand not used: ${e.message}`);
+    warn(`clefcut: brand not used: ${e.message}`);
   }
   const testWidth = Number(config.test_width) || brand && TEST_WIDTH[brand.format] || 350;
   return { schedule, brand, testWidth, palette: brandPalette(brand), designed: designedEffects(brand) };
@@ -16445,24 +16448,38 @@ async function run7(argv, { root, config }) {
     help: { type: "boolean", short: "h" }
   } });
   if (values.help || !positionals.length) {
-    console.log("usage: sagecut sweep <video> [--out DIR] [--workers N] [--step N] [--range A-B] [--pmin P] [--json]\n\nClef reads every frame at 960 px with the problem questions. Inside text windows it also asks the legibility question\nat the test width. Writes sweep.json and summary.md in the output folder.");
+    console.log("usage: clefcut sweep <video> [--out DIR] [--workers N] [--step N] [--range A-B] [--pmin P] [--json]\n\nClef reads every frame at 960 px with the problem questions. Inside text windows it also asks the legibility question\nat the test width. Writes sweep.json and summary.md in the output folder.");
     return values.help ? 0 : 2;
   }
   if (values.pmin !== void 0 && !(Number(values.pmin) > 0 && Number(values.pmin) <= 1)) throw new Error(`--pmin is a probability between 0 and 1 (got "${values.pmin}")`);
   if (values.json) setQuiet(true);
-  const video = path21.resolve(positionals[0]);
+  const { res, runs: runs2, md, out, failed } = await runSweep({ video: positionals[0], out: values.out, workers: values.workers, step: values.step, range: values.range, pmin: values.pmin, root, config });
+  if (values.json) console.log(JSON.stringify({ ...res, rows: void 0, out }));
+  else {
+    say(md);
+    say(`written: ${path21.relative(root, out) || out}`);
+  }
+  if (failed.length) {
+    warn(`clefcut: ${failed.length} frames were NOT read (Clef errors after retries). Run them again with --range, then use frames_read.`);
+    return 2;
+  }
+  return runs2.length ? 1 : 0;
+}
+async function runSweep({ video: videoArg, out: outArg, workers: workersArg, step: stepArg, range, pmin: pminArg, root, config }) {
+  if (pminArg !== void 0 && !(Number(pminArg) > 0 && Number(pminArg) <= 1)) throw new Error(`--pmin is a probability between 0 and 1 (got "${pminArg}")`);
+  const video = path21.resolve(videoArg);
   if (!fs24.existsSync(video)) throw new Error(`video not found: ${video}`);
   const info = await probe(video, { root });
   const ctx = loadContext(config);
   const bank = loadBank2(config);
-  const pmin = num2(values.pmin, bank.pmin ?? 0.8);
-  const step = Math.max(1, Math.round(num2(values.step, 1)));
-  const workers = Math.max(1, Math.round(num2(values.workers, config.workers || 4)));
-  const [f0, f1] = parseRange(values.range, info.frames);
+  const pmin = num2(pminArg, bank.pmin ?? 0.8);
+  const step = Math.max(1, Math.round(num2(stepArg, 1)));
+  const workers = Math.max(1, Math.round(num2(workersArg, config.workers || 4)));
+  const [f0, f1] = parseRange(range, info.frames);
   const typed = typedFrames(ctx.schedule);
   const client = new ClefClient({ root, workers, tag: "sweep" });
   client.check();
-  const out = ensureDir(values.out ? path21.resolve(values.out) : newRunDir(root, "sweep"));
+  const out = ensureDir(outArg ? path21.resolve(outArg) : newRunDir(root, "sweep"));
   const list = [];
   for (let f = f0; f <= f1; f += step) list.push(f);
   const batchFrames = workers * 10;
@@ -16562,16 +16579,7 @@ async function run7(argv, { root, config }) {
   writeJson(path21.join(out, "sweep.json"), res);
   const md = summary2(res, runs2, bank);
   fs24.writeFileSync(path21.join(out, "summary.md"), md);
-  if (values.json) console.log(JSON.stringify({ ...res, rows: void 0, out }));
-  else {
-    say(md);
-    say(`written: ${path21.relative(root, out) || out}`);
-  }
-  if (failed.length) {
-    warn(`sagecut: ${failed.length} frames were NOT read (Clef errors after retries). Run them again with --range, then use frames_read.`);
-    return 2;
-  }
-  return runs2.length ? 1 : 0;
+  return { res, runs: runs2, md, out, failed };
 }
 function summary2(r, runs2, bank) {
   const L = [];
@@ -16582,7 +16590,7 @@ function summary2(r, runs2, bank) {
   L.push("", "## Runs (question, first-last frame, frames flagged)");
   if (!runs2.length) L.push("- none");
   for (const x of runs2) L.push(`- ${x.q} f${x.frames[0]}-${x.frames[1]} n=${x.n}`);
-  L.push("", "Next: sagecut triage <this folder>");
+  L.push("", "Next: clefcut triage <this folder>");
   return L.join("\n") + "\n";
 }
 
@@ -16591,6 +16599,7 @@ var triage_exports = {};
 __export(triage_exports, {
   help: () => help7,
   run: () => run8,
+  runTriage: () => runTriage,
   sampleFrames: () => sampleFrames
 });
 import fs25 from "node:fs";
@@ -16796,9 +16805,9 @@ var toGray = ({ rgb, w, h }) => {
   for (let i = 0; i < w * h; i++) g[i] = rgb[i * 3] * 77 + rgb[i * 3 + 1] * 150 + rgb[i * 3 + 2] * 29 >> 8;
   return g;
 };
-async function popRatio(video, { root, fps, total, run: run16 }) {
-  if (run16.list.length > 100) return { ratio: null, pop: null, frame: null, reason: `the run is too long (${run16.list.length} flagged frames) for the one-frame pop measure` };
-  const list = run16.list;
+async function popRatio(video, { root, fps, total, run: run17 }) {
+  if (run17.list.length > 100) return { ratio: null, pop: null, frame: null, reason: `the run is too long (${run17.list.length} flagged frames) for the one-frame pop measure` };
+  const list = run17.list;
   const lo = Math.max(0, Math.min(...list) - 17);
   const hi = Math.min(total - 1, Math.max(...list) + 17);
   const nums = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
@@ -16820,8 +16829,8 @@ async function popRatio(video, { root, fps, total, run: run16 }) {
 // src/commands/triage.mjs
 var help7 = "Explain sweep flags by the schedule, then ask Clef about the rest, each question with a control.";
 var POP_CONFIRM = 3;
-function sampleFrames(run16) {
-  const l = run16.list;
+function sampleFrames(run17) {
+  const l = run17.list;
   return l.length <= 3 ? [...l] : [l[0], l[Math.floor(l.length / 2)], l[l.length - 1]];
 }
 async function pickControlFrame({ video, info, root, typed, flagged, count = 8 }) {
@@ -16845,16 +16854,22 @@ async function run8(argv, { root, config }) {
     help: { type: "boolean", short: "h" }
   } });
   if (values.help || !positionals.length) {
-    console.log("usage: sagecut triage <sweep-run-dir> [--video FILE] [--edge N] [--json]\n\nExplains sweep flags by the schedule (tolerance --edge frames, default 15), then asks Clef about the residual runs.\nEach question has a synthetic control from your own frames. Writes triage.json and triage.md in the run folder.");
+    console.log("usage: clefcut triage <sweep-run-dir> [--video FILE] [--edge N] [--json]\n\nExplains sweep flags by the schedule (tolerance --edge frames, default 15), then asks Clef about the residual runs.\nEach question has a synthetic control from your own frames. Writes triage.json and triage.md in the run folder.");
     return values.help ? 0 : 2;
   }
   if (values.json) setQuiet(true);
-  let dir = path22.resolve(positionals[0]);
+  const out = await runTriage({ dir: positionals[0], video: values.video, edge: values.edge, root, config });
+  if (values.json) console.log(JSON.stringify(out));
+  else say(markdown(out));
+  return out.counts.confirmed || out.counts["to-measure"] ? 1 : 0;
+}
+async function runTriage({ dir: dirArg, video: videoArg, edge: edgeArg, root, config }) {
+  let dir = path22.resolve(dirArg);
   if (fs25.existsSync(dir) && fs25.statSync(dir).isFile()) dir = path22.dirname(dir);
   const sweepFile = path22.join(dir, "sweep.json");
-  if (!fs25.existsSync(sweepFile)) throw new Error(`no sweep.json in ${dir}. Run "sagecut sweep <video>" first.`);
+  if (!fs25.existsSync(sweepFile)) throw new Error(`no sweep.json in ${dir}. Run "clefcut sweep <video>" first.`);
   const sw = readJson(sweepFile);
-  const video = path22.resolve(values.video || sw.video);
+  const video = path22.resolve(videoArg || sw.video);
   if (!fs25.existsSync(video)) throw new Error(`video not found: ${video}. Pass --video FILE.`);
   const sha = await fileSha12(video);
   if (sw.video_sha256_12 && sha !== sw.video_sha256_12) throw new Error(`${video} is not the video the sweep read (sha ${sha}, the sweep read ${sw.video_sha256_12}). Sweep this video first, or pass the swept file with --video.`);
@@ -16862,7 +16877,7 @@ async function run8(argv, { root, config }) {
   const ctx = loadContext(config);
   const bank = loadBank2(config);
   const pmin = sw.pmin ?? bank.pmin ?? 0.8;
-  const edge = Math.round(num2(values.edge, 15));
+  const edge = Math.round(num2(edgeArg, 15));
   const gap = 3 * (sw.step || 1);
   const t0 = Date.now();
   const flags = flagRows(sw.rows.filter((r) => !r.error), pmin);
@@ -16982,9 +16997,7 @@ async function run8(argv, { root, config }) {
   writeJson(path22.join(dir, "triage.json"), out);
   const md = markdown(out);
   fs25.writeFileSync(path22.join(dir, "triage.md"), md);
-  if (values.json) console.log(JSON.stringify(out));
-  else say(md);
-  return counts.confirmed || counts["to-measure"] ? 1 : 0;
+  return out;
 }
 function markdown(o) {
   const L = [`# Triage of ${o.sweep}`, ""];
@@ -17032,7 +17045,7 @@ async function run9(argv, { root, config }) {
     help: { type: "boolean", short: "h" }
   } });
   if (values.help || !(values.images || positionals.length) || !values.question) {
-    console.log('usage: sagecut ask --images <glob> --question "<text>" [--width N] [--control cut|black|frozen|ghost|offbrand|none]\n                   [--control-expect yes|no] [--out FILE] [--json]\n\nAsks Clef one yes/no question on each image (scaled to --width, default the test width). A control made from your first\nimage is asked with them. If Clef misses the defect in the control, the run is unreliable: its "no" answers prove nothing.\nWithout --control, the control is chosen from the question words; --control none turns it off.');
+    console.log('usage: clefcut ask --images <glob> --question "<text>" [--width N] [--control cut|black|frozen|ghost|offbrand|none]\n                   [--control-expect yes|no] [--out FILE] [--json]\n\nAsks Clef one yes/no question on each image (scaled to --width, default the test width). A control made from your first\nimage is asked with them. If Clef misses the defect in the control, the run is unreliable: its "no" answers prove nothing.\nWithout --control, the control is chosen from the question words; --control none turns it off.');
     return values.help ? 0 : 2;
   }
   if (values.json) setQuiet(true);
@@ -17351,7 +17364,7 @@ async function measureMarker(marker, opts = {}) {
 
 // src/commands/baseline.mjs
 var help9 = "Record the time and tokens of one critic reviewing N frames the old way (baseline for the results card).";
-var MARKER_PREFIX = "SAGECUT-BASELINE-";
+var MARKER_PREFIX = "CLEFCUT-BASELINE-";
 function pickFrames(total, n) {
   const k = Math.max(1, Math.min(n, total));
   return Array.from({ length: k }, (_, i) => Math.min(total - 1, Math.floor((i + 0.5) * total / k)));
@@ -17382,7 +17395,7 @@ async function prepare(argv, { root }) {
     frames: { type: "string" },
     json: { type: "boolean" }
   } });
-  if (!positionals.length) throw new Error("usage: sagecut baseline prepare <video> [--frames 10]");
+  if (!positionals.length) throw new Error("usage: clefcut baseline prepare <video> [--frames 10]");
   const video = path25.resolve(positionals[0]);
   if (!fs28.existsSync(video)) throw new Error(`video not found: ${video}`);
   const n = Math.max(1, Math.round(Number(values.frames) || 10));
@@ -17421,18 +17434,18 @@ async function prepare(argv, { root }) {
   say(`Start ONE critic sub-agent with exactly this prompt (the first line is the marker; do not change it):
 `);
   say(prompt);
-  say(`Then run: sagecut baseline measure ${marker}`);
+  say(`Then run: clefcut baseline measure ${marker}`);
   return 0;
 }
 async function measure(argv, { root }) {
   const { values, positionals } = parseArgs9({ args: argv, allowPositionals: true, options: { root: { type: "string" }, json: { type: "boolean" } } });
-  if (!positionals.length) throw new Error("usage: sagecut baseline measure <marker>");
+  if (!positionals.length) throw new Error("usage: clefcut baseline measure <marker>");
   const raw = positionals[0];
   const id = raw.startsWith(MARKER_PREFIX) ? raw.slice(MARKER_PREFIX.length) : raw;
   const marker = `${MARKER_PREFIX}${id}`;
   const dir = path25.join(qaDir(root), `baseline-${id}`);
   const metaFile = path25.join(dir, "meta.json");
-  if (!fs28.existsSync(metaFile)) throw new Error(`no baseline folder for ${marker} (${dir}). Run "sagecut baseline prepare <video>" first.`);
+  if (!fs28.existsSync(metaFile)) throw new Error(`no baseline folder for ${marker} (${dir}). Run "clefcut baseline prepare <video>" first.`);
   const meta = readJson(metaFile);
   const m = await measureMarker(marker, { sinceMs: Date.parse(meta.created) - 6e4 });
   if (!m.agents) throw new Error(`no Claude Code sub-agent file contains ${marker}. The critic must start with the prompt in ${path25.join(dir, "prompt.md")} and must have finished.`);
@@ -17482,7 +17495,7 @@ async function run10(argv, ctx) {
   const [sub, ...rest] = args;
   if (sub === "prepare") return prepare(i >= 0 ? [...rest, "--root", argv[i + 1]] : rest, ctx);
   if (sub === "measure") return measure(i >= 0 ? [...rest, "--root", argv[i + 1]] : rest, ctx);
-  console.log("usage: sagecut baseline prepare <video> [--frames 10]\n       sagecut baseline measure <marker>");
+  console.log("usage: clefcut baseline prepare <video> [--frames 10]\n       clefcut baseline measure <marker>");
   return sub === "--help" || sub === "-h" ? 0 : 2;
 }
 
@@ -17498,7 +17511,8 @@ __export(numbers_exports, {
   help: () => help10,
   openedImages: () => openedImages,
   renderCard: () => renderCard,
-  run: () => run11
+  run: () => run11,
+  runNumbers: () => runNumbers
 });
 import fs30 from "node:fs";
 import path27 from "node:path";
@@ -17531,9 +17545,9 @@ var ledgerFile = () => path26.join(userDataDir(), "savings.jsonl");
 var sessionFile = () => path26.join(userDataDir(), "session.json");
 function savingsRow(n, { video, sha = n.video_sha256_12, ts = (/* @__PURE__ */ new Date()).toISOString() } = {}) {
   const e = n.old_review_estimate;
-  const s = n.sagecut;
+  const s = n.clefcut;
   if (!e || !sha) return null;
-  const sagecutUsd = (s.clef_usd || 0) + (s.critics_usd || 0);
+  const clefcutUsd = (s.clef_usd || 0) + (s.critics_usd || 0);
   const criticsSeconds = s.critics_seconds ?? 0;
   return {
     ts,
@@ -17542,12 +17556,12 @@ function savingsRow(n, { video, sha = n.video_sha256_12, ts = (/* @__PURE__ */ n
     frames: s.frames_read,
     critics_measured: s.critics_usd !== null && s.critics_usd !== void 0,
     critics_time_measured: s.critics_seconds !== null && s.critics_seconds !== void 0,
-    sagecut_usd: Number(sagecutUsd.toFixed(4)),
-    sagecut_seconds: Number((s.qa_seconds + criticsSeconds).toFixed(1)),
+    clefcut_usd: Number(clefcutUsd.toFixed(4)),
+    clefcut_seconds: Number((s.qa_seconds + criticsSeconds).toFixed(1)),
     old_usd: e.usd,
     old_seconds: e.seconds,
     old_basis: e.reference === "house" ? "house" : "baseline",
-    saved_usd: Number((e.usd - sagecutUsd).toFixed(4)),
+    saved_usd: Number((e.usd - clefcutUsd).toFixed(4)),
     saved_seconds: Number((e.seconds - s.qa_seconds - criticsSeconds).toFixed(1))
   };
 }
@@ -17581,15 +17595,15 @@ function upsertRow(row, file = ledgerFile()) {
 function totals(rows, since = null) {
   const sel = rows.filter((r) => !since || r.ts >= since);
   const sum = (k) => sel.reduce((a, r) => a + (r[k] || 0), 0);
-  const sagecutUsd = sum("sagecut_usd"), sagecutS = sum("sagecut_seconds"), oldUsd = sum("old_usd"), oldS = sum("old_seconds");
+  const clefcutUsd = sum("clefcut_usd"), clefcutS = sum("clefcut_seconds"), oldUsd = sum("old_usd"), oldS = sum("old_seconds");
   return {
     films: sel.length,
-    sagecut_usd: Number(sagecutUsd.toFixed(4)),
-    sagecut_seconds: sagecutS,
+    clefcut_usd: Number(clefcutUsd.toFixed(4)),
+    clefcut_seconds: clefcutS,
     old_usd: Number(oldUsd.toFixed(4)),
     old_seconds: oldS,
-    saved_usd: Number((oldUsd - sagecutUsd).toFixed(4)),
-    saved_seconds: Number((oldS - sagecutS).toFixed(1))
+    saved_usd: Number((oldUsd - clefcutUsd).toFixed(4)),
+    saved_seconds: Number((oldS - clefcutS).toFixed(1))
   };
 }
 var BASIS_TEXT = {
@@ -17606,12 +17620,12 @@ function savedText(usd, seconds) {
 }
 function deliveryLine(row) {
   const saved = savedText(row.saved_usd, row.saved_seconds);
-  return (saved ? `Saved on this video: ${saved}. ` : "No saving on this video (estimate). ") + `SageCut: ${fmtUsd(row.sagecut_usd)} in ${fmtSeconds(row.sagecut_seconds)} (measured). Opus critics viewing the same ${row.frames} frames: about ${fmtUsd(row.old_usd)} in ${fmtSeconds(row.old_seconds)} (${BASIS_TEXT[row.old_basis] || BASIS_TEXT.baseline}).` + (row.critics_measured ? "" : " The critics were not measured, so SageCut's cost leaves them out.") + (row.critics_time_measured === false ? " The critics' time was not measured." : "");
+  return (saved ? `Saved on this video: ${saved}. ` : "No saving on this video (estimate). ") + `ClefCut: ${fmtUsd(row.clefcut_usd)} in ${fmtSeconds(row.clefcut_seconds)} (measured). Opus critics viewing the same ${row.frames} frames: about ${fmtUsd(row.old_usd)} in ${fmtSeconds(row.old_seconds)} (${BASIS_TEXT[row.old_basis] || BASIS_TEXT.baseline}).` + (row.critics_measured ? "" : " The critics were not measured, so ClefCut's cost leaves them out.") + (row.critics_time_measured === false ? " The critics' time was not measured." : "");
 }
-function sessionLine(t, label = "SageCut this session") {
+function sessionLine(t, label = "ClefCut this session") {
   const films = `${t.films} video${t.films === 1 ? "" : "s"}`;
   const saved = savedText(t.saved_usd, t.saved_seconds);
-  return `${label}: ${films}. ${saved ? `Saved ${saved}` : "No saving (estimate)"}. SageCut: ${fmtUsd(t.sagecut_usd)} in ${fmtSeconds(t.sagecut_seconds)} (measured). Opus critics on the same frames: ${fmtUsd(t.old_usd)} in ${fmtSeconds(t.old_seconds)} (estimate, list prices).`;
+  return `${label}: ${films}. ${saved ? `Saved ${saved}` : "No saving (estimate)"}. ClefCut: ${fmtUsd(t.clefcut_usd)} in ${fmtSeconds(t.clefcut_seconds)} (measured). Opus critics on the same frames: ${fmtUsd(t.old_usd)} in ${fmtSeconds(t.old_seconds)} (estimate, list prices).`;
 }
 function readSession(file = sessionFile()) {
   return readJson(file, null);
@@ -17680,7 +17694,7 @@ function computeNumbers({ sweeps = [], triages = [], gates = [], opened = [], op
   const gateUsd = gates.reduce((a, g) => a + (gateTokens(g) ? clefUsd({ billed_input_tokens: g.billed_input_tokens, image_tokens: g.image_tokens, output_tokens: g.output_tokens }, g.model || model) : g.usd || 0), 0);
   const seconds = [...sweeps, ...triages, ...gates].reduce((a, r) => a + (r.seconds || 0), 0);
   const distinct = new Set(opened);
-  out.sagecut = {
+  out.clefcut = {
     frames_read: framesRead(sweeps),
     qa_seconds: Number(seconds.toFixed(1)),
     clef_usd: Number((sweepUsd + triageUsd + gateUsd).toFixed(6)),
@@ -17704,27 +17718,27 @@ function computeNumbers({ sweeps = [], triages = [], gates = [], opened = [], op
     gate_seconds: sum(gates.map((g) => g.seconds)),
     sweep_seconds: sum(sweeps.map((s) => s.seconds)),
     triage_seconds: sum(triages.map((x) => x.seconds)),
-    critics_seconds: out.sagecut.critics_seconds,
+    critics_seconds: out.clefcut.critics_seconds,
     baseline_seconds: baseline && Number.isFinite(baseline.seconds) ? Number(baseline.seconds.toFixed(1)) : null
   };
   const t = triages[triages.length - 1];
   if (t) out.triage = { residual_runs: t.residual_runs, counts: t.counts };
   const b = baseline;
-  if (b && b.usd_per_frame !== null && b.usd_per_frame !== void 0 && !out.problems.length && out.sagecut.frames_read > 0) {
+  if (b && b.usd_per_frame !== null && b.usd_per_frame !== void 0 && !out.problems.length && out.clefcut.frames_read > 0) {
     const n = b.frames_reviewed;
     out.old_review_estimate = {
       estimate: true,
       baseline_frames: n,
       baseline_id: b.id,
-      frames: out.sagecut.frames_read,
-      usd: Number((b.usd_per_frame * out.sagecut.frames_read).toFixed(2)),
-      seconds: Math.round(b.seconds_per_frame * out.sagecut.frames_read),
+      frames: out.clefcut.frames_read,
+      usd: Number((b.usd_per_frame * out.clefcut.frames_read).toFixed(2)),
+      seconds: Math.round(b.seconds_per_frame * out.clefcut.frames_read),
       usd_per_frame: b.usd_per_frame,
       seconds_per_frame: b.seconds_per_frame,
       method: ESTIMATE_METHOD(n)
     };
-  } else if (!b && !out.problems.length && out.sagecut.frames_read > 0) {
-    const f = out.sagecut.frames_read;
+  } else if (!b && !out.problems.length && out.clefcut.frames_read > 0) {
+    const f = out.clefcut.frames_read;
     out.old_review_estimate = {
       estimate: true,
       reference: "house",
@@ -17736,13 +17750,13 @@ function computeNumbers({ sweeps = [], triages = [], gates = [], opened = [], op
       method: HOUSE_METHOD
     };
   } else out.old_review_estimate = null;
-  out.baseline_note = out.old_review_estimate ? null : out.problems.length ? "the runs are not all from the same video: no comparison is shown" : !out.sagecut.frames_read ? "no sweep: Clef read no frames, so no comparison is shown" : `the baseline model has no list price (${(b.price_unknown || []).join(", ")}): no comparison is shown`;
+  out.baseline_note = out.old_review_estimate ? null : out.problems.length ? "the runs are not all from the same video: no comparison is shown" : !out.clefcut.frames_read ? "no sweep: Clef read no frames, so no comparison is shown" : `the baseline model has no list price (${(b.price_unknown || []).join(", ")}): no comparison is shown`;
   return out;
 }
 function renderCard(n, runsUsed) {
-  const s = n.sagecut;
-  const L = ["# SageCut results", ""];
-  L.push("## SageCut (measured)", "");
+  const s = n.clefcut;
+  const L = ["# ClefCut results", ""];
+  L.push("## ClefCut (measured)", "");
   L.push(`- Frames Clef read: ${s.frames_read}`);
   L.push(`- QA time: ${fmtSeconds(s.qa_seconds)}`);
   L.push(`- Clef cost: ${fmtUsd(s.clef_usd)} (${s.clef_model} model rate)`);
@@ -17763,7 +17777,7 @@ function renderCard(n, runsUsed) {
   const tb = n.time_by_step || {};
   const step = (label, v) => `- ${label}: ${v === null || v === void 0 ? "not measured" : fmtSeconds(v)}`;
   L.push("", "## Time by step", "");
-  L.push("- Render: not measured by SageCut");
+  L.push("- Render: not measured by ClefCut");
   L.push(step("Gate", tb.gate_seconds), step("Sweep", tb.sweep_seconds), step("Triage", tb.triage_seconds));
   L.push(step("Critics", tb.critics_seconds), step("Baseline", tb.baseline_seconds));
   L.push("", "## Sources", "");
@@ -17795,18 +17809,27 @@ async function run11(argv, { root, config }) {
     help: { type: "boolean", short: "h" }
   } });
   if (values.help) {
-    console.log("usage: sagecut numbers [--runs DIR ...] [--critics-marker M] [--baseline DIR] [--json]\n\nWrites sagecut/qa/numbers.json and card.md from the QA files. Default runs: the newest sweep folder (with its triage) and the newest\ngate folder. Pass --runs for the runs of the exact file you deliver. The old review is estimated at the reference rate\n(src/core/costs.mjs); --baseline DIR uses a measured sample of this video instead.");
+    console.log("usage: clefcut numbers [--runs DIR ...] [--critics-marker M] [--baseline DIR] [--json]\n\nWrites clefcut/qa/numbers.json and card.md from the QA files. Default runs: the newest sweep folder (with its triage) and the newest\ngate folder. Pass --runs for the runs of the exact file you deliver. The old review is estimated at the reference rate\n(src/core/costs.mjs); --baseline DIR uses a measured sample of this video instead.");
     return 0;
   }
   if (values.json) setQuiet(true);
+  const { n, card, row } = await runNumbers({ runs: values.runs, criticsMarker: values["critics-marker"], baseline: values.baseline, root, config });
+  if (values.json) console.log(JSON.stringify(n));
+  else {
+    say(card);
+    if (row) say(deliveryLine(row));
+  }
+  return n.problems.length ? 2 : 0;
+}
+async function runNumbers({ runs: runs2 = [], criticsMarker, baseline: baselineArg, root, config }) {
   const qa = qaDir(root);
-  let runDirs = [...new Set((values.runs || []).map((d) => path27.resolve(d)))];
+  let runDirs = [...new Set((runs2 || []).map((d) => path27.resolve(d)))];
   if (!runDirs.length) {
     const sw = dirsOf(qa, "sweep-").filter((d) => exists(path27.join(d, "sweep.json"))).pop();
     const gt = dirsOf(qa, "gate-").filter((d) => exists(path27.join(d, "findings.json"))).pop();
     runDirs = [sw, gt].filter(Boolean);
   }
-  if (!runDirs.length) throw new Error('no QA runs found in sagecut/qa. Run "sagecut sweep <video>" first, or pass --runs DIR.');
+  if (!runDirs.length) throw new Error('no QA runs found in clefcut/qa. Run "clefcut sweep <video>" first, or pass --runs DIR.');
   const sweeps = [];
   const triages = [];
   const gates = [];
@@ -17857,17 +17880,17 @@ async function run11(argv, { root, config }) {
     if (!hit) throw new Error(`${rel} holds no sweep.json, triage.json, findings.json or opened.json`);
   }
   let critics = null;
-  if (values["critics-marker"]) {
-    critics = await measureMarker(values["critics-marker"]);
-    if (!critics.agents) throw new Error(`no Claude Code sub-agent file contains ${values["critics-marker"]}. Start each critic with that line in its prompt.`);
-    used.push(`${critics.agents} critic session file(s) with ${values["critics-marker"]}`);
+  if (criticsMarker) {
+    critics = await measureMarker(criticsMarker);
+    if (!critics.agents) throw new Error(`no Claude Code sub-agent file contains ${criticsMarker}. Start each critic with that line in its prompt.`);
+    used.push(`${critics.agents} critic session file(s) with ${criticsMarker}`);
   }
   let baseline = null;
-  const bdir = values.baseline ? path27.resolve(values.baseline) : null;
+  const bdir = baselineArg ? path27.resolve(baselineArg) : null;
   if (bdir && exists(path27.join(bdir, "baseline.json"))) {
     baseline = readJson(path27.join(bdir, "baseline.json"));
     used.push(`${path27.relative(root, bdir) || bdir}/baseline.json`);
-  } else if (bdir) throw new Error(`no baseline.json in ${bdir}. Run "sagecut baseline measure <marker>" first.`);
+  } else if (bdir) throw new Error(`no baseline.json in ${bdir}. Run "clefcut baseline measure <marker>" first.`);
   if (!baseline) used.push(`reference rate for the old review: src/core/costs.mjs HOUSE_REVIEW (${HOUSE_REVIEW.source})`);
   const n = computeNumbers({ sweeps, triages, gates, opened, openedRecorded, critics, baseline });
   n.generated = (/* @__PURE__ */ new Date()).toISOString();
@@ -17877,12 +17900,7 @@ async function run11(argv, { root, config }) {
   fs30.writeFileSync(path27.join(qa, "card.md"), card);
   const row = n.problems.length ? null : savingsRow(n, { video: gates.find((g) => g.video)?.video || sweeps.find((s) => s.video)?.video });
   if (row) upsertRow(row);
-  if (values.json) console.log(JSON.stringify(n));
-  else {
-    say(card);
-    if (row) say(deliveryLine(row));
-  }
-  return n.problems.length ? 2 : 0;
+  return { n, card, row, used };
 }
 
 // src/commands/deliver-check.mjs
@@ -18050,10 +18068,10 @@ async function checkVideo(video, ctx, { frameSet = null, ocr = true } = {}) {
   } else add("faststart", "skip", `container ${info.formatName}`);
   const audioMode = ["auto", "required", "none"].includes(ctx.config.audio) ? ctx.config.audio : "auto";
   if (audioMode === "none") {
-    add("audio stream", "info", "audio: none in sagecut.yaml; loudness and silence checks skipped");
+    add("audio stream", "info", "audio: none in clefcut.yaml; loudness and silence checks skipped");
   } else if (!info.hasAudio) {
-    if (audioMode === "required") add("audio stream", "fail", "no audio stream (audio: required in sagecut.yaml)");
-    else add("audio stream", "warn", "no audio stream. If the video should have sound, add the track; if it is silent by design, set audio: none in sagecut/sagecut.yaml");
+    if (audioMode === "required") add("audio stream", "fail", "no audio stream (audio: required in clefcut.yaml)");
+    else add("audio stream", "warn", "no audio stream. If the video should have sound, add the track; if it is silent by design, set audio: none in clefcut/clefcut.yaml");
   } else {
     add("audio stream", "pass", "present");
     const l = await loudness(video, { root });
@@ -18087,7 +18105,7 @@ async function checkVideo(video, ctx, { frameSet = null, ocr = true } = {}) {
   );
   if (ocr) {
     const engine = await tryCreateOcr();
-    if (!engine) add("placeholder text", "skip", 'OCR not available (run "sagecut doctor")');
+    if (!engine) add("placeholder text", "skip", 'OCR not available (run "clefcut doctor")');
     else {
       try {
         const step = Math.max(Math.round(fps), Math.floor(info.frames / 40));
@@ -18148,7 +18166,7 @@ async function run12(argv, ctx) {
     help: { type: "boolean" }
   } });
   if (values.help || !positionals[0]) {
-    say("usage: sagecut deliver-check <video> [--fix] [--out FILE] [--json]");
+    say("usage: clefcut deliver-check <video> [--fix] [--out FILE] [--json]");
     return values.help ? 0 : 2;
   }
   const video = path28.resolve(positionals[0]);
@@ -18163,7 +18181,7 @@ async function run12(argv, ctx) {
   if (values.fix) {
     const out = path28.resolve(values.out || path28.join(path28.dirname(video), `${path28.basename(video, path28.extname(video))}-delivery.mp4`));
     if (out === video) {
-      console.error("sagecut deliver-check: --out must not be the input file.");
+      console.error("clefcut deliver-check: --out must not be the input file.");
       return 2;
     }
     fixed = await fixVideo(video, checks2, out, { root: ctx.root });
@@ -18353,7 +18371,7 @@ async function applySplice(master, patchFile, [g0, g1], { root, out, log = () =>
 } }) {
   const plan = await planSplice(master, [g0, g1], { root });
   if (plan.g0 !== g0 || plan.g1 !== g1) {
-    throw new Error(`--frames ${g0}-${g1} is not GOP-aligned. Run "sagecut splice plan ${path29.basename(master)} --frames ${g0}-${g1}": it gives ${plan.g0}-${plan.g1}.`);
+    throw new Error(`--frames ${g0}-${g1} is not GOP-aligned. Run "clefcut splice plan ${path29.basename(master)} --frames ${g0}-${g1}": it gives ${plan.g0}-${plan.g1}.`);
   }
   const n = g1 - g0 + 1;
   const minfo = plan.info;
@@ -18362,7 +18380,7 @@ async function applySplice(master, patchFile, [g0, g1], { root, out, log = () =>
   if (pinfo.frames !== n) throw new Error(`The patch has ${pinfo.frames} frames; frames ${g0}-${g1} are ${n}. Render with --frames=${g0}-${g1}.`);
   if (Math.abs(pinfo.fps - minfo.fps) > 0.01) throw new Error(`The patch runs at ${pinfo.fps} fps; the master runs at ${minfo.fps} fps.`);
   const sei = readX264Options(master);
-  if (!sei.options) throw new Error("The master has no x264 encoder text, so SageCut cannot copy its encoder settings. Splice works on masters that x264 wrote (Remotion --codec h264).");
+  if (!sei.options) throw new Error("The master has no x264 encoder text, so ClefCut cannot copy its encoder settings. Splice works on masters that x264 wrote (Remotion --codec h264).");
   const bframes = Number((sei.options.match(/\bbframes=(\d+)/) || [])[1] || 0);
   const warnings = [];
   if (bframes > 0) warnings.push(`The master uses ${bframes} B-frames. The proof checks the result; use --codec h264 with bframes=0 for the safest splice.`);
@@ -18370,7 +18388,7 @@ async function applySplice(master, patchFile, [g0, g1], { root, out, log = () =>
   const ms = JSON.parse(mpr.stdout.toString()).streams[0];
   const sar11 = ms.sample_aspect_ratio === "1:1";
   const params = x264Params(sei.options, { sar11, minKeyint: n });
-  const tmp = fs33.mkdtempSync(path29.join(os3.tmpdir(), "sagecut-splice-"));
+  const tmp = fs33.mkdtempSync(path29.join(os3.tmpdir(), "clefcut-splice-"));
   const f = (name) => path29.join(tmp, name);
   try {
     const vf = [];
@@ -18507,11 +18525,11 @@ async function run13(argv, ctx) {
   } });
   const [sub, master, patch] = positionals;
   if (values.help || !sub) {
-    say("usage: sagecut splice plan <master> --frames A-B\n       sagecut splice apply <master> <patch.mp4> --frames G0-G1 [--out FILE]");
+    say("usage: clefcut splice plan <master> --frames A-B\n       clefcut splice apply <master> <patch.mp4> --frames G0-G1 [--out FILE]");
     return values.help ? 0 : 2;
   }
   if (!master) {
-    console.error("sagecut splice: give the master video file.");
+    console.error("clefcut splice: give the master video file.");
     return 2;
   }
   const root = ctx.root;
@@ -18527,19 +18545,19 @@ async function run13(argv, ctx) {
       say(`Master: ${p.total} frames at ${p.fps} fps, ${p.keyframes.length} keyframes.`);
       say(`You asked for frames ${range[0]}-${range[1]}. The GOP-aligned range is ${p.g0}-${p.g1} (${p.frames} frames).`);
       say(`Render it:  npx remotion render <id> patch.mp4 --codec h264 --crf 17 --color-space bt709 --frames=${p.g0}-${p.g1}`);
-      say(`Then:       sagecut splice apply ${path30.basename(master)} patch.mp4 --frames ${p.g0}-${p.g1}`);
+      say(`Then:       clefcut splice apply ${path30.basename(master)} patch.mp4 --frames ${p.g0}-${p.g1}`);
       return 0;
     }
     if (sub === "apply") {
       if (!patch) {
-        console.error("sagecut splice apply: give the patch video file.");
+        console.error("clefcut splice apply: give the patch video file.");
         return 2;
       }
       const range = parseRange2(values.frames);
       const ext = path30.extname(master);
       const out = values.out ? path30.resolve(values.out) : path30.join(path30.dirname(path30.resolve(master)), `${path30.basename(master, ext)}-spliced${ext || ".mp4"}`);
       if (path30.resolve(out) === path30.resolve(master)) {
-        console.error("sagecut splice: --out must not be the master file.");
+        console.error("clefcut splice: --out must not be the master file.");
         return 2;
       }
       const proof = await applySplice(master, patch, range, { root, out, log: (m) => say(m) });
@@ -18556,10 +18574,10 @@ async function run13(argv, ctx) {
       return proof.pass ? 0 : 1;
     }
   } catch (e) {
-    console.error(`sagecut splice: ${e.message}`);
+    console.error(`clefcut splice: ${e.message}`);
     return 2;
   }
-  console.error(`sagecut splice: unknown "${sub}". Use plan or apply.`);
+  console.error(`clefcut splice: unknown "${sub}". Use plan or apply.`);
   return 2;
 }
 
@@ -18576,7 +18594,7 @@ import { fileURLToPath as fileURLToPath4 } from "node:url";
 import { parseArgs as parseArgs13 } from "node:util";
 var help13 = "onboarding state: status | welcome | done";
 var stateFile = () => path31.join(userDataDir(), "state.json");
-var FALLBACK = "Welcome to SageCut, a way to produce Remotion videos faster and cheaper, with every frame checked by the Clef decision model on Cloudflare Workers AI.";
+var FALLBACK = "Welcome to ClefCut, a way to produce Remotion videos faster and cheaper, with every frame checked by the Clef decision model on Cloudflare Workers AI.";
 function isRemotionProject(root) {
   try {
     const p = readJson(path31.join(root, "package.json"));
@@ -18591,8 +18609,8 @@ function status(root, config) {
   return {
     onboarded: Boolean(state.onboarded),
     hasKey: loadClefEnv(root).hasKey,
-    hasBrand: fs34.existsSync(config ? config.brandPath : path31.join(sagecutDir(root), "brand.yaml")),
-    hasSchedule: fs34.existsSync(config ? config.schedulePath : path31.join(sagecutDir(root), "schedule.json")),
+    hasBrand: fs34.existsSync(config ? config.brandPath : path31.join(clefcutDir(root), "brand.yaml")),
+    hasSchedule: fs34.existsSync(config ? config.schedulePath : path31.join(clefcutDir(root), "schedule.json")),
     isRemotionProject: isRemotionProject(root),
     keyPage: KEY_PAGE
   };
@@ -18612,7 +18630,7 @@ async function run14(argv, ctx) {
   const { values, positionals } = parseArgs13({ args: argv, allowPositionals: true, options: { json: { type: "boolean" }, root: { type: "string" }, help: { type: "boolean" } } });
   const sub = positionals[0];
   if (values.help || !sub) {
-    say("usage: sagecut onboard status [--json] | welcome | done");
+    say("usage: clefcut onboard status [--json] | welcome | done");
     return values.help ? 0 : 2;
   }
   if (sub === "status") {
@@ -18631,7 +18649,7 @@ async function run14(argv, ctx) {
     say("Onboarding finished.");
     return 0;
   }
-  console.error(`sagecut onboard: unknown "${sub}". Use status, welcome or done.`);
+  console.error(`clefcut onboard: unknown "${sub}". Use status, welcome or done.`);
   return 2;
 }
 
@@ -18660,21 +18678,167 @@ async function run15(argv) {
     return 0;
   }
   if (sub !== "show") {
-    console.error(`sagecut savings: unknown "${sub}". Use show, session-start or stop.`);
+    console.error(`clefcut savings: unknown "${sub}". Use show, session-start or stop.`);
     return 2;
   }
   const sess = readSession();
   const rows = readRows();
   if (!rows.length) {
-    say('No delivered video has savings yet. Savings appear after "sagecut numbers" runs on a video that Clef swept.');
+    say('No delivered video has savings yet. Savings appear after "clefcut numbers" runs on a video that Clef swept.');
     return 0;
   }
-  say(sess ? sessionLine(totals(rows, sess.startedAt)) : sessionLine(totals(rows, null), "SageCut, all videos"));
+  say(sess ? sessionLine(totals(rows, sess.startedAt)) : sessionLine(totals(rows, null), "ClefCut, all videos"));
   return 0;
+}
+
+// src/commands/review.mjs
+var review_exports = {};
+__export(review_exports, {
+  help: () => help15,
+  run: () => run16
+});
+import fs35 from "node:fs";
+import path32 from "node:path";
+import { parseArgs as parseArgs14 } from "node:util";
+var help15 = "the whole QA in one command: gate, sweep, triage and numbers, with one summary";
+var USAGE3 = `usage: clefcut review <video> [--step N] [--range A-B] [--workers N] [--no-sweep] [--no-clef] [--no-ocr] [--max-billed N] [--out DIR] [--json]
+
+Runs gate (measures every frame, asks Clef about about 20 prepared pictures), sweep (Clef reads every Nth frame),
+triage (explains or asks again about what the sweep flagged) and numbers (cost and savings). Writes review.md and
+review.json in the run folder; the gate and sweep folders inside it hold the details and the pictures.
+  --step N        sweep every Nth frame: 2 or 3 for quick drafts, 1 (the default) before delivery
+  --no-sweep      gate only: about 20 Clef requests, fast
+  --no-clef       measurements only: no Clef request, no cost (implies --no-sweep)
+  --json          print review.json (for agents)
+Exit: 0 pass, 1 findings or open items, 2 error.`;
+var round6 = (x) => Math.round(x * 1e6) / 1e6;
+var plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+async function run16(argv, { root, config }) {
+  let args;
+  try {
+    args = parseArgs14({ args: argv, allowPositionals: true, options: {
+      step: { type: "string" },
+      range: { type: "string" },
+      workers: { type: "string" },
+      out: { type: "string" },
+      "max-billed": { type: "string" },
+      "no-sweep": { type: "boolean" },
+      "no-clef": { type: "boolean" },
+      "no-ocr": { type: "boolean" },
+      json: { type: "boolean" },
+      root: { type: "string" },
+      help: { type: "boolean", short: "h" }
+    } });
+  } catch (e) {
+    console.error(`clefcut review: ${e.message}
+${USAGE3}`);
+    return 2;
+  }
+  const { values: v, positionals } = args;
+  if (v.help || positionals.length !== 1) {
+    console.log(USAGE3);
+    return v.help ? 0 : 2;
+  }
+  const noClef = !!v["no-clef"], noSweep = noClef || !!v["no-sweep"];
+  if (!noClef) new ClefClient({ root }).check();
+  const maxBilled = v["max-billed"] ? Number(v["max-billed"].replace(/[,_]/g, "")) : 2e5;
+  if (!Number.isFinite(maxBilled) || maxBilled <= 0) {
+    console.error("clefcut review: --max-billed needs a number");
+    return 2;
+  }
+  if (v.json) setQuiet(true);
+  const video = path32.resolve(positionals[0]);
+  if (!fs35.existsSync(video)) throw new Error(`video not found: ${video}`);
+  const dir = ensureDir(v.out ? path32.resolve(v.out) : newRunDir(root, "review"));
+  const t0 = Date.now();
+  say("review: 1/4 gate");
+  const gateDir = ensureDir(path32.join(dir, "gate"));
+  const g = await runGate({ video, root, config, outDir: gateDir, noClef, noOcr: !!v["no-ocr"], maxBilled });
+  let sw = null, tr = null;
+  if (!noSweep) {
+    say("review: 2/4 sweep");
+    sw = await runSweep({ video, out: path32.join(dir, "sweep"), workers: v.workers, step: v.step, range: v.range, root, config });
+    if (sw.runs.length) {
+      say("review: 3/4 triage");
+      tr = await runTriage({ dir: sw.out, video, root, config });
+    }
+  }
+  say("review: 4/4 numbers");
+  let nb;
+  try {
+    nb = await runNumbers({ runs: [gateDir, sw && sw.out].filter(Boolean), root, config });
+  } catch (e) {
+    nb = { error: e.message };
+  }
+  const clefErrors = g.clef_errors.length, asked = g.clef_asked;
+  const open = tr ? tr.counts.confirmed + tr.counts["to-measure"] : 0;
+  const error = asked > 0 && clefErrors === asked || sw && sw.failed.length > 0;
+  const exit = error ? 2 : g.findings.length || g.escalations.length || open || clefErrors ? 1 : 0;
+  const rel = (p) => path32.relative(dir, p).split(path32.sep).join("/");
+  const summary3 = {
+    video,
+    out: dir,
+    exit,
+    seconds: Math.round((Date.now() - t0) / 100) / 10,
+    gate: {
+      findings: g.findings.length,
+      escalations: g.escalations.length,
+      clef_asked: asked,
+      clef_errors: clefErrors,
+      summary: rel(path32.join(gateDir, "summary.md")),
+      critic_frames: rel(path32.join(gateDir, "critic-frames"))
+    },
+    sweep: sw ? { frames_read: sw.res.frames_read, step: sw.res.step, failed_frames: sw.failed, flagged_runs: sw.runs.length, summary: rel(path32.join(sw.out, "summary.md")) } : null,
+    triage: tr ? { counts: tr.counts, open, explained: Object.values(tr.explained).reduce((a, b) => a + b, 0), summary: rel(path32.join(sw.out, "triage.md")) } : null,
+    cost: { clef_usd: round6((g.clef.usd || 0) + (sw ? sw.res.usd : 0) + (tr ? tr.usd : 0)), model: g.clef.model || sw && sw.res.model || null },
+    numbers: nb.n ? { card: path32.join(qaDir(root), "card.md"), saved: nb.row ? deliveryLine(nb.row) : null } : { error: nb.error || null },
+    // the findings themselves, so an agent can act without opening more files; images are relative to gate/
+    findings: g.findings.map((f) => ({ check: f.check, severity: f.severity, frames: f.frames, t_s: f.t_s, beat: f.beat, evidence: f.evidence, image: f.crop ? `gate/${f.crop}` : null })),
+    escalations: g.escalations.map((f) => ({ check: f.check, severity: f.severity, frames: f.frames, t_s: f.t_s, beat: f.beat, evidence: f.evidence, image: f.crop ? `gate/${f.crop}` : null })),
+    open_runs: tr ? tr.residual.filter((r) => r.label === "confirmed" || r.label === "to-measure").map((r) => ({ question: r.q, frames: r.frames, label: r.label, detail: r.detail })) : []
+  };
+  writeJson(path32.join(dir, "review.json"), summary3);
+  const md = reviewMd(summary3);
+  fs35.writeFileSync(path32.join(dir, "review.md"), md);
+  if (v.json) console.log(JSON.stringify(summary3));
+  else {
+    say(md);
+    say(`written: ${path32.relative(root, dir) || dir}`);
+  }
+  return exit;
+}
+function reviewMd(s) {
+  const L = [`# ClefCut review: ${path32.basename(s.video)}`, ""];
+  L.push(`Result: ${s.exit === 0 ? "PASS" : s.exit === 1 ? "FINDINGS (exit 1)" : "ERROR (exit 2)"}. ${fmtSeconds(s.seconds)}, Clef ${fmtUsd(s.cost.clef_usd)}${s.cost.model ? ` (model ${s.cost.model})` : ""}.`, "");
+  L.push(`## Gate: ${plural(s.gate.findings, "finding")}, ${plural(s.gate.escalations, "escalation")}`, "");
+  if (s.gate.clef_errors) L.push(`Clef gave no answer to ${s.gate.clef_errors} of ${s.gate.clef_asked} questions: those are errors, not passes.`);
+  for (const f of s.findings.slice(0, 12)) L.push(`- [${f.severity}] ${f.check} f${f.frames.join("-")} (${f.t_s} s${f.beat ? `, ${f.beat}` : ""}): ${f.evidence}${f.image ? ` Image: ${f.image}` : ""}`);
+  for (const f of s.escalations.slice(0, 6)) L.push(`- escalate ${f.check} f${f.frames.join("-")} (${f.t_s} s): ${f.evidence}${f.image ? ` Image: ${f.image}` : ""}`);
+  if (s.findings.length > 12 || s.escalations.length > 6) L.push(`- ... the rest in ${s.gate.summary}`);
+  L.push("", `Details: ${s.gate.summary}. Critic frames: ${s.gate.critic_frames}/.`, "");
+  if (s.sweep) {
+    L.push(`## Sweep: ${plural(s.sweep.frames_read, "frame")} read (every ${s.sweep.step === 1 ? "" : `${s.sweep.step}th `}frame), ${plural(s.sweep.flagged_runs, "flagged run")}`, "");
+    if (s.sweep.failed_frames.length) L.push(`${s.sweep.failed_frames.length} frames were NOT read (first: ${s.sweep.failed_frames.slice(0, 8).join(", ")}). Run the review again, or "clefcut sweep" on those frames with --range.`, "");
+  } else L.push("## Sweep: not run", "");
+  if (s.triage) {
+    const c = s.triage.counts;
+    L.push(`## Triage: ${plural(s.triage.explained, "flag")} explained by the schedule; ${c.confirmed} confirmed, ${c["to-measure"]} to measure, ${c["cleared-by-clef"] + c["cleared-by-measurement"]} cleared`, "");
+    for (const r of s.open_runs.slice(0, 8)) L.push(`- ${r.label} ${r.question} f${r.frames[0]}-${r.frames[1]}: ${r.detail}`);
+    if (s.open_runs.length) L.push("");
+  }
+  if (s.numbers.saved) L.push(s.numbers.saved, "");
+  L.push("## Next", "");
+  if (s.exit === 0) L.push('- Nothing to fix. Run "clefcut deliver-check <video>" before you hand the file over.');
+  else {
+    L.push('- Fix the findings above in the Remotion code (or the schedule, if a flag is designed), render again, then run "clefcut review" again.');
+    L.push('- To look at a frame: open its image if your model can see pictures; otherwise ask Clef about it with "clefcut ask --images <image> --question \\"...\\"".');
+  }
+  return L.join("\n") + "\n";
 }
 
 // src/cli.mjs
 var COMMANDS = {
+  review: review_exports,
   doctor: doctor_exports,
   init: init_exports,
   brand: brand_exports,
@@ -18692,13 +18856,13 @@ var COMMANDS = {
 };
 function usage() {
   const lines = Object.entries(COMMANDS).map(([k, m]) => `  ${k.padEnd(15)} ${m.help || ""}`);
-  return `sagecut ${VERSION}: video QA for Remotion with the Clef decision model (Cloudflare Workers AI)
+  return `clefcut ${VERSION}: video QA for Remotion with the Clef decision model (Cloudflare Workers AI)
 
-usage: sagecut <command> [options]
+usage: clefcut <command> [options]
 
 ${lines.join("\n")}
 
-sagecut <command> --help for the options of one command.`;
+clefcut <command> --help for the options of one command.`;
 }
 async function main() {
   const [cmd, ...argv] = process.argv.slice(2);
@@ -18734,7 +18898,7 @@ ${usage()}`);
 main().then((code) => {
   process.exitCode = code ?? 0;
 }).catch((e) => {
-  console.error(`sagecut: ${e.message}`);
-  if (process.env.SAGECUT_DEBUG) console.error(e.stack);
+  console.error(`clefcut: ${e.message}`);
+  if (process.env.CLEFCUT_DEBUG) console.error(e.stack);
   process.exitCode = 2;
 });

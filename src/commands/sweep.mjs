@@ -1,4 +1,4 @@
-// sagecut sweep <video> [--out DIR] [--workers N] [--step N] [--range A-B] [--pmin P] [--json]
+// clefcut sweep <video> [--out DIR] [--workers N] [--step N] [--range A-B] [--pmin P] [--json]
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -21,26 +21,36 @@ export async function run(argv, { root, config }) {
     root: { type: 'string' }, out: { type: 'string' }, workers: { type: 'string' }, step: { type: 'string' }, range: { type: 'string' },
     pmin: { type: 'string' }, json: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help || !positionals.length) {
-    console.log('usage: sagecut sweep <video> [--out DIR] [--workers N] [--step N] [--range A-B] [--pmin P] [--json]\n\n' +
+    console.log('usage: clefcut sweep <video> [--out DIR] [--workers N] [--step N] [--range A-B] [--pmin P] [--json]\n\n' +
       'Clef reads every frame at 960 px with the problem questions. Inside text windows it also asks the legibility question\n' +
       'at the test width. Writes sweep.json and summary.md in the output folder.');
     return values.help ? 0 : 2;
   }
   if (values.pmin !== undefined && !(Number(values.pmin) > 0 && Number(values.pmin) <= 1)) throw new Error(`--pmin is a probability between 0 and 1 (got "${values.pmin}")`);
   if (values.json) setQuiet(true);
-  const video = path.resolve(positionals[0]);
+  const { res, runs, md, out, failed } = await runSweep({ video: positionals[0], out: values.out, workers: values.workers, step: values.step, range: values.range, pmin: values.pmin, root, config });
+  if (values.json) console.log(JSON.stringify({ ...res, rows: undefined, out }));
+  else { say(md); say(`written: ${path.relative(root, out) || out}`); }
+  if (failed.length) { warn(`clefcut: ${failed.length} frames were NOT read (Clef errors after retries). Run them again with --range, then use frames_read.`); return 2; }
+  return runs.length ? 1 : 0;
+}
+
+// The sweep itself: reads the frames, writes sweep.json and summary.md in `out`, returns the result. run() and review use it.
+export async function runSweep({ video: videoArg, out: outArg, workers: workersArg, step: stepArg, range, pmin: pminArg, root, config }) {
+  if (pminArg !== undefined && !(Number(pminArg) > 0 && Number(pminArg) <= 1)) throw new Error(`--pmin is a probability between 0 and 1 (got "${pminArg}")`);
+  const video = path.resolve(videoArg);
   if (!fs.existsSync(video)) throw new Error(`video not found: ${video}`);
   const info = await ff.probe(video, { root });
   const ctx = loadContext(config);
   const bank = loadBank(config);
-  const pmin = num(values.pmin, bank.pmin ?? 0.8);
-  const step = Math.max(1, Math.round(num(values.step, 1)));
-  const workers = Math.max(1, Math.round(num(values.workers, config.workers || 4)));
-  const [f0, f1] = parseRange(values.range, info.frames);
+  const pmin = num(pminArg, bank.pmin ?? 0.8);
+  const step = Math.max(1, Math.round(num(stepArg, 1)));
+  const workers = Math.max(1, Math.round(num(workersArg, config.workers || 4)));
+  const [f0, f1] = parseRange(range, info.frames);
   const typed = typedFrames(ctx.schedule);
   const client = new ClefClient({ root, workers, tag: 'sweep' });
   client.check();                                                     // fails early, with a fix, when there is no key
-  const out = ensureDir(values.out ? path.resolve(values.out) : newRunDir(root, 'sweep'));
+  const out = ensureDir(outArg ? path.resolve(outArg) : newRunDir(root, 'sweep'));
 
   const list = [];
   for (let f = f0; f <= f1; f += step) list.push(f);
@@ -106,10 +116,7 @@ export async function run(argv, { root, config }) {
   writeJson(path.join(out, 'sweep.json'), res);
   const md = summary(res, runs, bank);
   fs.writeFileSync(path.join(out, 'summary.md'), md);
-  if (values.json) console.log(JSON.stringify({ ...res, rows: undefined, out }));
-  else { say(md); say(`written: ${path.relative(root, out) || out}`); }
-  if (failed.length) { warn(`sagecut: ${failed.length} frames were NOT read (Clef errors after retries). Run them again with --range, then use frames_read.`); return 2; }
-  return runs.length ? 1 : 0;
+  return { res, runs, md, out, failed };
 }
 
 function summary(r, runs, bank) {
@@ -123,6 +130,6 @@ function summary(r, runs, bank) {
   L.push('', '## Runs (question, first-last frame, frames flagged)');
   if (!runs.length) L.push('- none');
   for (const x of runs) L.push(`- ${x.q} f${x.frames[0]}-${x.frames[1]} n=${x.n}`);
-  L.push('', 'Next: sagecut triage <this folder>');
+  L.push('', 'Next: clefcut triage <this folder>');
   return L.join('\n') + '\n';
 }

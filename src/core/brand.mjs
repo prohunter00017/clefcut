@@ -1,4 +1,4 @@
-// sagecut/brand.yaml: the brand. The build reads it through src/brand.ts; the QA reads it here.
+// clefcut/brand.yaml: the brand. The build reads it through src/brand.ts; the QA reads it here.
 import fs from 'node:fs';
 import YAML from 'yaml';
 
@@ -24,7 +24,7 @@ export function validateBrand(b) {
 
 export function loadBrand(file, { required = false } = {}) {
   if (!fs.existsSync(file)) {
-    if (required) throw new Error(`No brand file at ${file}. Run "sagecut brand" (or /sagecut:start).`);
+    if (required) throw new Error(`No brand file at ${file}. Run "clefcut brand" (or /clefcut:start).`);
     return null;
   }
   const b = YAML.parse(fs.readFileSync(file, 'utf8'));

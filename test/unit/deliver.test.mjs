@@ -7,7 +7,7 @@ import { run as ff } from '../../src/core/ffmpeg.mjs';
 import { checkVideo, fixVideo, holdRanges, covered } from '../../src/commands/deliver-check.mjs';
 import { copyFindings, looksLikeCode } from '../../src/commands/check-schedule.mjs';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sagecut-test-deliver-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'clefcut-test-deliver-'));
 let have = true;
 try { const r = await ff('ffmpeg', ['-hide_banner', '-encoders'], { root: tmp }); have = r.code === 0 && /libx264/.test(r.stdout.toString()); } catch { have = false; }
 const opts = { skip: have ? false : 'ffmpeg with libx264 not available' };

@@ -1,4 +1,4 @@
-// ffmpeg / ffprobe for SageCut. First choice: the binaries that Remotion 4 ships in @remotion/compositor-<platform>
+// ffmpeg / ffprobe for ClefCut. First choice: the binaries that Remotion 4 ships in @remotion/compositor-<platform>
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -42,8 +42,8 @@ let cached = null;
 export function locate(projectRoot = process.cwd()) {
   if (cached && cached.root === projectRoot) return cached.tools;
   let tools = null;
-  if (process.env.SAGECUT_FFMPEG && process.env.SAGECUT_FFPROBE) {
-    tools = { ffmpeg: process.env.SAGECUT_FFMPEG, ffprobe: process.env.SAGECUT_FFPROBE, env: { ...process.env }, source: 'env' };
+  if (process.env.CLEFCUT_FFMPEG && process.env.CLEFCUT_FFPROBE) {
+    tools = { ffmpeg: process.env.CLEFCUT_FFMPEG, ffprobe: process.env.CLEFCUT_FFPROBE, env: { ...process.env }, source: 'env' };
   }
   if (!tools) {
     const dir = findCompositorDir(projectRoot);
@@ -68,7 +68,7 @@ export function run(bin, args, { root = process.cwd(), input = null } = {}) {
     const out = []; let err = '';
     p.stdout.on('data', (d) => out.push(d));
     p.stderr.on('data', (d) => { err += d.toString(); if (err.length > 2_000_000) err = err.slice(-1_000_000); });
-    p.on('error', (e) => reject(new Error(`${bin} could not start (${exe}): ${e.message}. Run "sagecut doctor".`)));
+    p.on('error', (e) => reject(new Error(`${bin} could not start (${exe}): ${e.message}. Run "clefcut doctor".`)));
     p.on('close', (code) => resolve({ code, stdout: Buffer.concat(out), stderr: err }));
     if (input) { p.stdin.write(input); }
     p.stdin.end();
@@ -121,7 +121,7 @@ export async function* frames(video, { root = process.cwd(), width, height, gray
     if (p.exitCode === null) p.kill();
   }
   const code = await new Promise((r) => (failed || p.exitCode !== null ? r(p.exitCode) : (p.once('close', r), p.once('error', () => r(null)))));
-  if (failed) throw new Error(`ffmpeg could not start (${t.ffmpeg}): ${failed.message}. Run "sagecut doctor".`);
+  if (failed) throw new Error(`ffmpeg could not start (${t.ffmpeg}): ${failed.message}. Run "clefcut doctor".`);
   if (code !== 0 && code !== null && index === start) throw new Error(`ffmpeg decode failed: ${err.trim().slice(0, 300)}`);
 }
 

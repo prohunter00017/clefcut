@@ -1,16 +1,16 @@
-// sagecut/sagecut.yaml: per-project settings. Every key is optional.
+// clefcut/clefcut.yaml: per-project settings. Every key is optional.
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
-import { sagecutDir } from './paths.mjs';
+import { clefcutDir } from './paths.mjs';
 
-export const DEFAULTS = { schedule: 'sagecut/schedule.json', brand: 'sagecut/brand.yaml', workers: 4, test_width: null,
-  question_bank: null, composition: null, audio: 'auto' };   // audio: auto | required | none (deliver-check)
+export const DEFAULTS = { schedule: 'clefcut/schedule.json', brand: 'clefcut/brand.yaml', workers: 4, test_width: null,
+  question_bank: null, sweep_bank: null, composition: null, audio: 'auto' };   // audio: auto | required | none (deliver-check)
 
 export const TEST_WIDTH = { '16:9': 350, '9:16': 210, '1:1': 375 };
 
 export function loadConfig(root) {
-  const file = path.join(sagecutDir(root), 'sagecut.yaml');
+  const file = path.join(clefcutDir(root), 'clefcut.yaml');
   let cfg = {};
   if (fs.existsSync(file)) cfg = YAML.parse(fs.readFileSync(file, 'utf8')) || {};
   const out = { ...DEFAULTS, ...cfg, root, file };

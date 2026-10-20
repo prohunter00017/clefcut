@@ -4,5 +4,5 @@ import { fileURLToPath } from 'node:url';
 
 const runtime = new URL('../runtime/', import.meta.url);
 // This is scoped to this Node process; it does not change the user's shell.
-process.env.CLAUDE_PLUGIN_ROOT = fileURLToPath(runtime);
-await import(new URL('bin/sagecut.mjs', runtime).href);
+process.env.CLEFCUT_ROOT = fileURLToPath(runtime);
+await import(new URL('bin/clefcut.mjs', runtime).href);

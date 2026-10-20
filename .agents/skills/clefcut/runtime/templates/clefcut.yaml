@@ -1,0 +1,9 @@
+# ClefCut settings for this project. Every key is optional.
+# schedule: clefcut/schedule.json
+# brand: clefcut/brand.yaml
+# workers: 4              # parallel Clef requests; lower it if Workers AI answers HTTP 429
+# question_bank: clefcut/gate-bank.yaml    # a project gate question file (YAML)
+# sweep_bank: clefcut/sweep-bank.json      # a project sweep and triage question file (JSON)
+# test_width: 350          # else from the brand format
+audio: auto               # auto: no audio track gives a warning | required: no audio track fails | none: silent by design, skip loudness and silence checks
+# composition: __COMPOSITION__

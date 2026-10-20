@@ -2,9 +2,9 @@
 
 The house rules are a floor. The brand decides everything above the floor. If a brand choice breaks a floor, report it with the measurement. The user decides.
 
-## 1. Rules that SageCut measures
+## 1. Rules that ClefCut measures
 
-| House rule | SageCut check |
+| House rule | ClefCut check |
 |---|---|
 | Legibility floors at 1080 px wide: headline 60 px, body 40 px, captions 30 px, URLs and legal text 26 px. Scale the floors with the width of the video. | OCR measures the text height. |
 | Each placement has a test width: 350 px by default, 210 px for 9:16 in a feed, 375 px for 1:1 in a feed. | Clef reads the frame at the test width. |
@@ -38,7 +38,7 @@ The house rules are a floor. The brand decides everything above the floor. If a 
 | 1:1 in a feed | 375 px |
 | 9:16 in a feed (a tall video shown small) | 210 px |
 
-Test the narrowest width that your placement allows, not the widest. The brand `format` sets the test width. `test_width` in `sagecut/sagecut.yaml` overrides it.
+Test the narrowest width that your placement allows, not the widest. The brand `format` sets the test width. `test_width` in `clefcut/clefcut.yaml` overrides it.
 
 ### Frame quality
 
@@ -65,7 +65,7 @@ Test the narrowest width that your placement allows, not the widest. The brand `
 5. A third critic asks one question: is the idea stale or over-explained? A rules gate cannot see this.
 6. Never approve your own hero element.
 7. The critics use these house rules and `brand.yaml` as their rubric.
-8. The critics look at the contact sheet and the frames that `gate` selects. This is the step that SageCut makes faster and cheaper.
+8. The critics look at the contact sheet and the frames that `gate` selects. This is the step that ClefCut makes faster and cheaper.
 
 ### Rules for every dispatch to a critic
 
@@ -88,7 +88,7 @@ Test the narrowest width that your placement allows, not the widest. The brand `
 - Build interface elements in code. Never stretch a logo.
 - Get a reference video before the build, if the user has one. Extract its pacing, type and palette frame by frame.
 - Get the brand files before you start. A brand that arrives in the middle of a build costs a rebuild.
-- Take timing from `sagecut/schedule.json`. Elements that move together must use one source of timing, not parallel curves.
+- Take timing from `clefcut/schedule.json`. Elements that move together must use one source of timing, not parallel curves.
 - Build exactly the content that the user asked for. Do not add lines or features.
 
 ## 4. Checks before you show a render

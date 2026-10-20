@@ -1,4 +1,4 @@
-// Savings ledger: one row per delivered film version, in ~/.sagecut/savings.jsonl (all projects).
+// Savings ledger: one row per delivered film version, in ~/.clefcut/savings.jsonl (all projects).
 import fs from 'node:fs';
 import path from 'node:path';
 import { userDataDir } from './paths.mjs';
@@ -9,17 +9,17 @@ export const ledgerFile = () => path.join(userDataDir(), 'savings.jsonl');
 export const sessionFile = () => path.join(userDataDir(), 'session.json');
 
 export function savingsRow(n, { video, sha = n.video_sha256_12, ts = new Date().toISOString() } = {}) {
-  const e = n.old_review_estimate; const s = n.sagecut;
+  const e = n.old_review_estimate; const s = n.clefcut;
   if (!e || !sha) return null;
-  const sagecutUsd = (s.clef_usd || 0) + (s.critics_usd || 0);
-  const criticsSeconds = s.critics_seconds ?? 0;      // the critics' time is part of SageCut's time
+  const clefcutUsd = (s.clef_usd || 0) + (s.critics_usd || 0);
+  const criticsSeconds = s.critics_seconds ?? 0;      // the critics' time is part of ClefCut's time
   return {
     ts, sha, video: path.basename(video || 'unknown'), frames: s.frames_read,
     critics_measured: s.critics_usd !== null && s.critics_usd !== undefined,
     critics_time_measured: s.critics_seconds !== null && s.critics_seconds !== undefined,
-    sagecut_usd: Number(sagecutUsd.toFixed(4)), sagecut_seconds: Number((s.qa_seconds + criticsSeconds).toFixed(1)),
+    clefcut_usd: Number(clefcutUsd.toFixed(4)), clefcut_seconds: Number((s.qa_seconds + criticsSeconds).toFixed(1)),
     old_usd: e.usd, old_seconds: e.seconds, old_basis: e.reference === 'house' ? 'house' : 'baseline',
-    saved_usd: Number((e.usd - sagecutUsd).toFixed(4)), saved_seconds: Number((e.seconds - s.qa_seconds - criticsSeconds).toFixed(1)),
+    saved_usd: Number((e.usd - clefcutUsd).toFixed(4)), saved_seconds: Number((e.seconds - s.qa_seconds - criticsSeconds).toFixed(1)),
   };
 }
 
@@ -51,12 +51,12 @@ export function totals(rows, since = null) {
   const sel = rows.filter((r) => !since || r.ts >= since);
   const sum = (k) => sel.reduce((a, r) => a + (r[k] || 0), 0);
   // the saving is recomputed from the two sides of each row
-  const sagecutUsd = sum('sagecut_usd'), sagecutS = sum('sagecut_seconds'), oldUsd = sum('old_usd'), oldS = sum('old_seconds');
+  const clefcutUsd = sum('clefcut_usd'), clefcutS = sum('clefcut_seconds'), oldUsd = sum('old_usd'), oldS = sum('old_seconds');
   return {
     films: sel.length,
-    sagecut_usd: Number(sagecutUsd.toFixed(4)), sagecut_seconds: sagecutS,
+    clefcut_usd: Number(clefcutUsd.toFixed(4)), clefcut_seconds: clefcutS,
     old_usd: Number(oldUsd.toFixed(4)), old_seconds: oldS,
-    saved_usd: Number((oldUsd - sagecutUsd).toFixed(4)), saved_seconds: Number((oldS - sagecutS).toFixed(1)),
+    saved_usd: Number((oldUsd - clefcutUsd).toFixed(4)), saved_seconds: Number((oldS - clefcutS).toFixed(1)),
   };
 }
 
@@ -75,18 +75,18 @@ export function savedText(usd, seconds) {
 export function deliveryLine(row) {
   const saved = savedText(row.saved_usd, row.saved_seconds);
   return (saved ? `Saved on this video: ${saved}. ` : 'No saving on this video (estimate). ') +
-    `SageCut: ${fmtUsd(row.sagecut_usd)} in ${fmtSeconds(row.sagecut_seconds)} (measured). ` +
+    `ClefCut: ${fmtUsd(row.clefcut_usd)} in ${fmtSeconds(row.clefcut_seconds)} (measured). ` +
     `Opus critics viewing the same ${row.frames} frames: about ${fmtUsd(row.old_usd)} in ${fmtSeconds(row.old_seconds)} (${BASIS_TEXT[row.old_basis] || BASIS_TEXT.baseline}).` +
-    (row.critics_measured ? '' : ' The critics were not measured, so SageCut\'s cost leaves them out.')
+    (row.critics_measured ? '' : ' The critics were not measured, so ClefCut\'s cost leaves them out.')
     + (row.critics_time_measured === false ? ' The critics\' time was not measured.' : '');
 }
 
 // The line shown for a session. `t` comes from totals().
-export function sessionLine(t, label = 'SageCut this session') {
+export function sessionLine(t, label = 'ClefCut this session') {
   const films = `${t.films} video${t.films === 1 ? '' : 's'}`;
   const saved = savedText(t.saved_usd, t.saved_seconds);
   return `${label}: ${films}. ${saved ? `Saved ${saved}` : 'No saving (estimate)'}. ` +
-    `SageCut: ${fmtUsd(t.sagecut_usd)} in ${fmtSeconds(t.sagecut_seconds)} (measured). Opus critics on the same frames: ${fmtUsd(t.old_usd)} in ${fmtSeconds(t.old_seconds)} (estimate, list prices).`;
+    `ClefCut: ${fmtUsd(t.clefcut_usd)} in ${fmtSeconds(t.clefcut_seconds)} (measured). Opus critics on the same frames: ${fmtUsd(t.old_usd)} in ${fmtSeconds(t.old_seconds)} (estimate, list prices).`;
 }
 
 export function readSession(file = sessionFile()) { return readJson(file, null); }

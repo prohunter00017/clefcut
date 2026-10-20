@@ -1,4 +1,4 @@
-// sagecut numbers [--runs DIR ...] [--critics-marker M] [--baseline DIR] [--json]
+// clefcut numbers [--runs DIR ...] [--critics-marker M] [--baseline DIR] [--json]
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -54,7 +54,7 @@ export function computeNumbers({ sweeps = [], triages = [], gates = [], opened =
   const gateUsd = gates.reduce((a, g) => a + (gateTokens(g) ? clefUsd({ billed_input_tokens: g.billed_input_tokens, image_tokens: g.image_tokens, output_tokens: g.output_tokens }, g.model || model) : (g.usd || 0)), 0);
   const seconds = [...sweeps, ...triages, ...gates].reduce((a, r) => a + (r.seconds || 0), 0);
   const distinct = new Set(opened);
-  out.sagecut = {
+  out.clefcut = {
     frames_read: framesRead(sweeps),
     qa_seconds: Number(seconds.toFixed(1)),
     clef_usd: Number((sweepUsd + triageUsd + gateUsd).toFixed(6)),
@@ -77,23 +77,23 @@ export function computeNumbers({ sweeps = [], triages = [], gates = [], opened =
     gate_seconds: sum(gates.map((g) => g.seconds)),
     sweep_seconds: sum(sweeps.map((s) => s.seconds)),
     triage_seconds: sum(triages.map((x) => x.seconds)),
-    critics_seconds: out.sagecut.critics_seconds,
+    critics_seconds: out.clefcut.critics_seconds,
     baseline_seconds: baseline && Number.isFinite(baseline.seconds) ? Number(baseline.seconds.toFixed(1)) : null,
   };
   const t = triages[triages.length - 1];
   if (t) out.triage = { residual_runs: t.residual_runs, counts: t.counts };
   const b = baseline;
-  if (b && b.usd_per_frame !== null && b.usd_per_frame !== undefined && !out.problems.length && out.sagecut.frames_read > 0) {
+  if (b && b.usd_per_frame !== null && b.usd_per_frame !== undefined && !out.problems.length && out.clefcut.frames_read > 0) {
     const n = b.frames_reviewed;
     out.old_review_estimate = {
-      estimate: true, baseline_frames: n, baseline_id: b.id, frames: out.sagecut.frames_read,
-      usd: Number((b.usd_per_frame * out.sagecut.frames_read).toFixed(2)),
-      seconds: Math.round(b.seconds_per_frame * out.sagecut.frames_read),
+      estimate: true, baseline_frames: n, baseline_id: b.id, frames: out.clefcut.frames_read,
+      usd: Number((b.usd_per_frame * out.clefcut.frames_read).toFixed(2)),
+      seconds: Math.round(b.seconds_per_frame * out.clefcut.frames_read),
       usd_per_frame: b.usd_per_frame, seconds_per_frame: b.seconds_per_frame,
       method: ESTIMATE_METHOD(n),
     };
-  } else if (!b && !out.problems.length && out.sagecut.frames_read > 0) {
-    const f = out.sagecut.frames_read;
+  } else if (!b && !out.problems.length && out.clefcut.frames_read > 0) {
+    const f = out.clefcut.frames_read;
     out.old_review_estimate = {
       estimate: true, reference: 'house', frames: f,
       usd: Number((HOUSE_REVIEW.usd_per_frame * f).toFixed(2)),
@@ -104,14 +104,14 @@ export function computeNumbers({ sweeps = [], triages = [], gates = [], opened =
   } else out.old_review_estimate = null;
   out.baseline_note = out.old_review_estimate ? null
     : out.problems.length ? 'the runs are not all from the same video: no comparison is shown'
-      : !out.sagecut.frames_read ? 'no sweep: Clef read no frames, so no comparison is shown'
+      : !out.clefcut.frames_read ? 'no sweep: Clef read no frames, so no comparison is shown'
         : `the baseline model has no list price (${(b.price_unknown || []).join(', ')}): no comparison is shown`;
   return out;
 }
 
 export function renderCard(n, runsUsed) {
-  const s = n.sagecut; const L = ['# SageCut results', ''];
-  L.push('## SageCut (measured)', '');
+  const s = n.clefcut; const L = ['# ClefCut results', ''];
+  L.push('## ClefCut (measured)', '');
   L.push(`- Frames Clef read: ${s.frames_read}`);
   L.push(`- QA time: ${fmtSeconds(s.qa_seconds)}`);
   L.push(`- Clef cost: ${fmtUsd(s.clef_usd)} (${s.clef_model} model rate)`);
@@ -134,7 +134,7 @@ export function renderCard(n, runsUsed) {
   const tb = n.time_by_step || {};
   const step = (label, v) => `- ${label}: ${v === null || v === undefined ? 'not measured' : fmtSeconds(v)}`;
   L.push('', '## Time by step', '');
-  L.push('- Render: not measured by SageCut');
+  L.push('- Render: not measured by ClefCut');
   L.push(step('Gate', tb.gate_seconds), step('Sweep', tb.sweep_seconds), step('Triage', tb.triage_seconds));
   L.push(step('Critics', tb.critics_seconds), step('Baseline', tb.baseline_seconds));
   L.push('', '## Sources', '');
@@ -158,21 +158,29 @@ export async function run(argv, { root, config }) {
     root: { type: 'string' }, runs: { type: 'string', multiple: true }, 'critics-marker': { type: 'string' }, baseline: { type: 'string' },
     json: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help) {
-    console.log('usage: sagecut numbers [--runs DIR ...] [--critics-marker M] [--baseline DIR] [--json]\n\n' +
-      'Writes sagecut/qa/numbers.json and card.md from the QA files. Default runs: the newest sweep folder (with its triage) and the newest\n' +
+    console.log('usage: clefcut numbers [--runs DIR ...] [--critics-marker M] [--baseline DIR] [--json]\n\n' +
+      'Writes clefcut/qa/numbers.json and card.md from the QA files. Default runs: the newest sweep folder (with its triage) and the newest\n' +
       'gate folder. Pass --runs for the runs of the exact file you deliver. The old review is estimated at the reference rate\n' +
       '(src/core/costs.mjs); --baseline DIR uses a measured sample of this video instead.');
     return 0;
   }
   if (values.json) setQuiet(true);
+  const { n, card, row } = await runNumbers({ runs: values.runs, criticsMarker: values['critics-marker'], baseline: values.baseline, root, config });
+  if (values.json) console.log(JSON.stringify(n));
+  else { say(card); if (row) say(deliveryLine(row)); }
+  return n.problems.length ? 2 : 0;
+}
+
+// The numbers of the given runs (default: the newest sweep and gate): writes numbers.json, card.md and the ledger row.
+export async function runNumbers({ runs = [], criticsMarker, baseline: baselineArg, root, config }) {
   const qa = qaDir(root);
-  let runDirs = [...new Set((values.runs || []).map((d) => path.resolve(d)))];       // a folder given twice counts once
+  let runDirs = [...new Set((runs || []).map((d) => path.resolve(d)))];       // a folder given twice counts once
   if (!runDirs.length) {
     const sw = dirsOf(qa, 'sweep-').filter((d) => exists(path.join(d, 'sweep.json'))).pop();
     const gt = dirsOf(qa, 'gate-').filter((d) => exists(path.join(d, 'findings.json'))).pop();
     runDirs = [sw, gt].filter(Boolean);
   }
-  if (!runDirs.length) throw new Error('no QA runs found in sagecut/qa. Run "sagecut sweep <video>" first, or pass --runs DIR.');
+  if (!runDirs.length) throw new Error('no QA runs found in clefcut/qa. Run "clefcut sweep <video>" first, or pass --runs DIR.');
   const sweeps = []; const triages = []; const gates = []; const opened = []; const used = []; let openedRecorded = false;
   for (const d of runDirs) {
     if (!exists(d)) throw new Error(`run folder not found: ${d}`);
@@ -192,15 +200,15 @@ export async function run(argv, { root, config }) {
     if (!hit) throw new Error(`${rel} holds no sweep.json, triage.json, findings.json or opened.json`);
   }
   let critics = null;
-  if (values['critics-marker']) {
-    critics = await measureMarker(values['critics-marker']);
-    if (!critics.agents) throw new Error(`no Claude Code sub-agent file contains ${values['critics-marker']}. Start each critic with that line in its prompt.`);
-    used.push(`${critics.agents} critic session file(s) with ${values['critics-marker']}`);
+  if (criticsMarker) {
+    critics = await measureMarker(criticsMarker);
+    if (!critics.agents) throw new Error(`no Claude Code sub-agent file contains ${criticsMarker}. Start each critic with that line in its prompt.`);
+    used.push(`${critics.agents} critic session file(s) with ${criticsMarker}`);
   }
   let baseline = null;
-  const bdir = values.baseline ? path.resolve(values.baseline) : null;      // only an explicit baseline replaces the reference rate
+  const bdir = baselineArg ? path.resolve(baselineArg) : null;      // only an explicit baseline replaces the reference rate
   if (bdir && exists(path.join(bdir, 'baseline.json'))) { baseline = readJson(path.join(bdir, 'baseline.json')); used.push(`${path.relative(root, bdir) || bdir}/baseline.json`); }
-  else if (bdir) throw new Error(`no baseline.json in ${bdir}. Run "sagecut baseline measure <marker>" first.`);
+  else if (bdir) throw new Error(`no baseline.json in ${bdir}. Run "clefcut baseline measure <marker>" first.`);
   if (!baseline) used.push(`reference rate for the old review: src/core/costs.mjs HOUSE_REVIEW (${HOUSE_REVIEW.source})`);
 
   const n = computeNumbers({ sweeps, triages, gates, opened, openedRecorded, critics, baseline });
@@ -212,7 +220,5 @@ export async function run(argv, { root, config }) {
   // A delivered film version: one ledger row per video hash, replaced when the numbers are run again.
   const row = n.problems.length ? null : savingsRow(n, { video: gates.find((g) => g.video)?.video || sweeps.find((s) => s.video)?.video });
   if (row) upsertRow(row);
-  if (values.json) console.log(JSON.stringify(n));
-  else { say(card); if (row) say(deliveryLine(row)); }
-  return n.problems.length ? 2 : 0;
+  return { n, card, row, used };
 }

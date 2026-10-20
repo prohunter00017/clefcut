@@ -1,4 +1,4 @@
-// sagecut ask --images <glob> --question "<text>" [--width N] [--control cut|black|frozen|ghost|offbrand|none] [--control-expect yes|no]
+// clefcut ask --images <glob> --question "<text>" [--width N] [--control cut|black|frozen|ghost|offbrand|none] [--control-expect yes|no]
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -16,7 +16,7 @@ export async function run(argv, { root, config }) {
     root: { type: 'string' }, images: { type: 'string', multiple: true }, question: { type: 'string' }, width: { type: 'string' },
     control: { type: 'string' }, 'control-expect': { type: 'string' }, out: { type: 'string' }, json: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help || !(values.images || positionals.length) || !values.question) {
-    console.log('usage: sagecut ask --images <glob> --question "<text>" [--width N] [--control cut|black|frozen|ghost|offbrand|none]\n' +
+    console.log('usage: clefcut ask --images <glob> --question "<text>" [--width N] [--control cut|black|frozen|ghost|offbrand|none]\n' +
       '                   [--control-expect yes|no] [--out FILE] [--json]\n\n' +
       'Asks Clef one yes/no question on each image (scaled to --width, default the test width). A control made from your first\n' +
       'image is asked with them. If Clef misses the defect in the control, the run is unreliable: its "no" answers prove nothing.\n' +

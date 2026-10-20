@@ -1,15 +1,15 @@
 # Third-party notices
 
-SageCut itself is MIT licensed (see LICENSE). This file lists the third-party files that SageCut ships. The full licence texts are in `bin/licenses/` (written by `npm run build`).
+ClefCut itself is MIT licensed (see LICENSE). This file lists the third-party files that ClefCut ships. The full licence texts are in `bin/licenses/` (written by `npm run build`).
 
 ## Shipped files that are not ours
 
-| Component | Version | Licence | Copyright | Where it is in SageCut |
+| Component | Version | Licence | Copyright | Where it is in ClefCut |
 |---|---|---|---|---|
-| tesseract.js | 7.0.0 | Apache-2.0 | tesseract.js contributors (naptha/tesseract.js) | Bundled in `bin/sagecut.mjs`; worker script bundled in `bin/ocr/worker.cjs` |
+| tesseract.js | 7.0.0 | Apache-2.0 | tesseract.js contributors (naptha/tesseract.js) | Bundled in `bin/clefcut.mjs`; worker script bundled in `bin/ocr/worker.cjs` |
 | tesseract.js-core (Tesseract OCR compiled to WebAssembly) | 7.0.0 | Apache-2.0 | antimatter15 and tesseract.js-core contributors; contains the Tesseract OCR engine (Google and the Tesseract authors, Apache-2.0) and Leptonica (Dan Bloomberg, BSD-2-Clause), as set out by the upstream package | `bin/ocr/tesseract-core-lstm.wasm`, `tesseract-core-simd-lstm.wasm`, `tesseract-core-relaxedsimd-lstm.wasm`, and the glue code inside `bin/ocr/worker.cjs` |
 | tessdata_fast `eng.traineddata` | main branch, downloaded 2026-10-13 | Apache-2.0 | The Tesseract OCR authors (tesseract-ocr/tessdata_fast) | `assets/eng.traineddata` |
-| yaml | 2.9.1 | ISC | Copyright Eemeli Aro | Bundled in `bin/sagecut.mjs` |
+| yaml | 2.9.1 | ISC | Copyright Eemeli Aro | Bundled in `bin/clefcut.mjs` |
 | regenerator-runtime | 0.13.11 | MIT | Copyright (c) 2014-present, Facebook, Inc. | Bundled in `bin/ocr/worker.cjs` |
 | wasm-feature-detect | 1.9.0 | Apache-2.0 | Copyright 2017 Google Inc. | Bundled in `bin/ocr/worker.cjs` |
 | node-fetch | 2.7.0 | MIT | Copyright (c) 2016 David Frank | Bundled with tesseract.js |

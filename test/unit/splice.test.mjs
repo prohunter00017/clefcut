@@ -7,7 +7,7 @@ import { run as ff, locate } from '../../src/core/ffmpeg.mjs';
 import { parseRange, planSplice, applySplice, x264Params, readX264Options } from '../../src/splice/splice.mjs';
 import { isFaststart, avcC } from '../../src/splice/mp4.mjs';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sagecut-test-splice-'));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'clefcut-test-splice-'));
 const root = tmp;
 let have = true;
 try { const r = await ff('ffmpeg', ['-hide_banner', '-encoders'], { root }); have = r.code === 0 && /libx264/.test(r.stdout.toString()); } catch { have = false; }

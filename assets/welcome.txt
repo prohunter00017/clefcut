@@ -33,7 +33,7 @@
 ⠀⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠚⠿⠿⠿⠿⠟⠻⠿⠛⠻⠛⠻⠟⠛⠿⠿
 
   measured, frame by frame.
-  every frame checked by Clef, from Levanto Labs.
+  every frame checked by Clef. A fork of SageCut by Levanto Labs.
 
-Welcome to SageCut, a way to produce Remotion videos faster and
+Welcome to ClefCut, a way to produce Remotion videos faster and
 cheaper, with every frame checked by the Clef decision model.

@@ -1,4 +1,4 @@
-# SageCut gate question bank (v1). Every question is a yes/no or a scale question that Clef answers about ONE prepared picture:
+# ClefCut gate question bank (v1). Every question is a yes/no or a scale question that Clef answers about ONE prepared picture:
 # a settled frame, a phone-size frame, a contact sheet of one beat, or a difference image of two frames.
 # A fail answer is a finding. A null answer, or a scale answer within `escalate margin` of the pass line, is an escalation.
 # Questions marked escalate_only never make a finding. {expected_order} is filled from the schedule.

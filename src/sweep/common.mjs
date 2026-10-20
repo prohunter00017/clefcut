@@ -9,9 +9,9 @@ import { warn } from '../core/log.mjs';
 export function loadContext(config) {
   let schedule = null; let brand = null;
   if (fs.existsSync(config.schedulePath)) {
-    try { schedule = loadSchedule(config.schedulePath); } catch (e) { warn(`sagecut: schedule not used: ${e.message.split('\n')[0]}`); }
+    try { schedule = loadSchedule(config.schedulePath); } catch (e) { warn(`clefcut: schedule not used: ${e.message.split('\n')[0]}`); }
   }
-  try { brand = loadBrand(config.brandPath); } catch (e) { warn(`sagecut: brand not used: ${e.message}`); }
+  try { brand = loadBrand(config.brandPath); } catch (e) { warn(`clefcut: brand not used: ${e.message}`); }
   const testWidth = Number(config.test_width) || (brand && TEST_WIDTH[brand.format]) || 350;
   return { schedule, brand, testWidth, palette: brandPalette(brand), designed: designedEffects(brand) };
 }

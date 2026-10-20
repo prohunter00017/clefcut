@@ -1,8 +1,8 @@
 # Schedule format
 
-`sagecut/schedule.json` is the one source of timing. The composition imports it. SageCut checks the render against it. Thus, the video and the QA always use the same timing.
+`clefcut/schedule.json` is the one source of timing. The composition imports it. ClefCut checks the render against it. Thus, the video and the QA always use the same timing.
 
-Run `sagecut init` to make a skeleton. Run `sagecut check-schedule` after each edit.
+Run `clefcut init` to make a skeleton. Run `clefcut check-schedule` after each edit.
 
 ## Required fields
 
@@ -23,7 +23,7 @@ Run `sagecut init` to make a skeleton. Run `sagecut check-schedule` after each e
 | `id` | Unique name. Required. |
 | `start`, `end` | First and last frame. Required. `start` is not after `end`. `end` is not after `frames`. |
 | `hold` | Optional. A frame, or `[first, last]`. A frame means "from this frame to `end`". It declares an on-purpose still. |
-| `order` | Optional. A number for sorting. |
+| `order` | Optional. A list of element ids sets the order in which the elements must arrive (the staging check). Without it, the order is the order of `in`. A number is accepted and ignored. |
 | `elements` | A list of elements. |
 
 ## Element
@@ -49,7 +49,7 @@ The `frames` pair is the first and last frame of the transition. The QA checks t
 
 | Field | Meaning |
 |---|---|
-| `cuts` | Frames where a hard cut is on purpose. The QA skips findings within 2 frames of a cut. |
+| `cuts` | Frames where a hard cut is on purpose. The gate skips motion findings within 1 frame of a cut; triage explains sweep flags within 2 frames. |
 | `effects` | A list of `{ "kind": "flash" or "glitch", "frames": [first, last] }`. It declares designed flashes and glitches. The QA skips findings inside these frames. |
 | `image_regions` | Areas with footage or photos, as boxes. OCR and text checks skip them. |
 | `static_holds` | Frame ranges where a frozen image is on purpose. |
@@ -59,7 +59,7 @@ The `frames` pair is the first and last frame of the transition. The QA checks t
 
 ## Tolerance
 
-Triage uses the schedule windows with a tolerance of 15 frames. A flag inside a window (plus or minus 15 frames) of an element, a transition or a hold has an explanation. A flag outside all windows stays on the list for a targeted Clef question.
+Triage uses the schedule windows with a tolerance of 15 frames. A flag within 15 frames of an element's entry or exit, or of a transition, has an explanation. A flag during a hold has none: everything should be still there, so a flag in a hold is exactly what QA must catch. A glitch flag inside a declared `effects` window is explained only when the brand's `motion.designed` list allows that kind. A flag outside all windows stays on the list for a targeted Clef question.
 
 ## Full example
 
@@ -125,20 +125,21 @@ A transition window alone does not cover a flash or a glitch. Declare each one i
 
 ## Project settings that touch the schedule
 
-These keys are in `sagecut/sagecut.yaml`:
+These keys are in `clefcut/clefcut.yaml`:
 
 | Key | Meaning |
 |---|---|
 | `audio` | `auto` (default), `required` or `none`. With `auto`, a missing audio stream is a warning. Set `none` for a video that is silent by design. |
 | `test_width` | Overrides the test width of the brand format. |
-| `workers` | Parallel Clef requests. |
-| `question_bank` | A project question file. |
+| `workers` | Parallel Clef requests (default 4). Lower it if Workers AI answers HTTP 429. |
+| `question_bank` | A project gate question file (YAML). |
+| `sweep_bank` | A project sweep and triage question file (JSON). |
 | `composition` | The Remotion composition id. |
 
 ## Using the schedule in Remotion
 
-1. `init` adds `src/sagecut/useSchedule.ts` with `useBeat(id)` and `<Scheduled id="...">`.
-2. Set `"resolveJsonModule": true` in `compilerOptions` of `tsconfig.json`. `init` prints this note. Then the composition can import `sagecut/schedule.json`.
+1. `init` adds `src/clefcut/useSchedule.ts` with `useBeat(id)` and `<Scheduled id="...">`.
+2. Set `"resolveJsonModule": true` in `compilerOptions` of `tsconfig.json`. `init` prints this note. Then the composition can import `clefcut/schedule.json`.
 3. `Root.tsx` reads `fps`, `frames`, `width` and `height` from the schedule.
 4. Do not type frame numbers in the composition. Read them from the schedule.
-5. On-screen numbers about the QA stay as placeholders until `sagecut/qa/numbers.json` exists.
+5. On-screen numbers about the QA stay as placeholders until `clefcut/qa/numbers.json` exists.

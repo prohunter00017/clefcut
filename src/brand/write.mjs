@@ -1,9 +1,9 @@
-// brand set: validates a brand, fetches fonts, writes sagecut/brand.yaml, src/brand.ts and the saved copy.
+// brand set: validates a brand, fetches fonts, writes clefcut/brand.yaml, src/brand.ts and the saved copy.
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import { validateBrand } from '../core/brand.mjs';
-import { userDataDir, sagecutDir, ensureDir } from '../core/paths.mjs';
+import { userDataDir, clefcutDir, ensureDir } from '../core/paths.mjs';
 import { fetchLimited } from './fromurl.mjs';
 
 const MODERN_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
@@ -122,7 +122,7 @@ export function brandTs(brand, logoPublic) {
     }
   }
   const c = brand.colors;
-  return `// Written by SageCut from sagecut/brand.yaml. Do not edit by hand: edit the brand file, then run "sagecut brand set sagecut/brand.yaml".
+  return `// Written by ClefCut from clefcut/brand.yaml. Do not edit by hand: edit the brand file, then run "clefcut brand set clefcut/brand.yaml".
 // Needs @remotion/fonts in the project: npx remotion add @remotion/fonts
 import { staticFile } from 'remotion';
 import { loadFont } from '@remotion/fonts';
@@ -155,7 +155,7 @@ export const loadBrandFonts = () => Promise.all(FONT_FACES.map((f) => loadFont(f
 `;
 }
 
-// The saved copy in ~/.sagecut/brands/ carries its own logo and font files (brands/<slug>/...), with paths relative to
+// The saved copy in ~/.clefcut/brands/ carries its own logo and font files (brands/<slug>/...), with paths relative to
 // the brands folder, so "brand use" works in any project, even after the first project is gone.
 function saveBrand(brand, { root, brandDir }) {
   const brands = ensureDir(path.join(userDataDir(), 'brands')), s = slug(brand.name), own = path.join(brands, s);
@@ -188,13 +188,13 @@ export async function setBrand(file, { root, log = console.log }) {
   const msgs = [...await installFonts(brand, { root, brandDir })];
   const logos = installLogos(brand, { root, brandDir }); msgs.push(...logos.msgs);
 
-  const dest = path.join(sagecutDir(root), 'brand.yaml');
+  const dest = path.join(clefcutDir(root), 'brand.yaml');
   ensureDir(path.dirname(dest));
   fs.writeFileSync(dest, YAML.stringify(brand));
   ensureDir(path.join(root, 'src'));
   fs.writeFileSync(path.join(root, 'src', 'brand.ts'), brandTs(brand, logos.public));
   const saved = saveBrand(brand, { root, brandDir });
-  msgs.push(`wrote sagecut/brand.yaml, src/brand.ts and ${saved}`);
+  msgs.push(`wrote clefcut/brand.yaml, src/brand.ts and ${saved}`);
   for (const m of msgs) log(m);
   return { brand, messages: msgs, saved };
 }

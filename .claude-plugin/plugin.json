@@ -1,11 +1,11 @@
 {
-  "name": "sagecut",
-  "displayName": "SageCut",
-  "version": "0.3.0",
-  "description": "House-standard QA for Remotion videos in your brand. Every frame is measured and read by the Clef decision model on Cloudflare Workers AI.",
-  "author": { "name": "Levanto Labs", "url": "https://levanto.ai" },
-  "homepage": "https://github.com/levantolabs/sagecut-release",
-  "repository": "https://github.com/levantolabs/sagecut-release",
+  "name": "clefcut",
+  "displayName": "ClefCut",
+  "version": "0.4.0",
+  "description": "House-standard QA for Remotion videos in your brand. Every frame is measured and read by the Clef decision model on Cloudflare Workers AI. A fork of SageCut by Levanto Labs.",
+  "author": { "name": "prohunter00017", "url": "https://github.com/prohunter00017" },
+  "homepage": "https://github.com/prohunter00017/clefcut",
+  "repository": "https://github.com/prohunter00017/clefcut",
   "license": "MIT",
-  "keywords": ["remotion", "video", "qa", "brand", "clef", "cloudflare"]
+  "keywords": ["remotion", "video", "qa", "brand", "clef", "cloudflare", "workers-ai", "agent-skills"]
 }

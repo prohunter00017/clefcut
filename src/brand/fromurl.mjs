@@ -5,7 +5,7 @@ import { analyseCss, mergeAnalyses, pickFontSource, firstFamily } from './css.mj
 import { assignRoles, parseColor } from './color.mjs';
 import { VERSION } from '../core/version.mjs';
 
-export const UA = `Mozilla/5.0 (compatible; SageCut/${VERSION}; +https://github.com/levantolabs/sagecut)`;
+export const UA = `Mozilla/5.0 (compatible; ClefCut/${VERSION}; +https://github.com/prohunter00017/clefcut)`;
 const CAP_BYTES = 5 * 1024 * 1024;
 const MAX_CSS = 10;
 
@@ -124,7 +124,7 @@ export async function brandFromUrl(urlStr, { root, log = () => {} }) {
 
   // logos
   const cands = findLogos(html, base);
-  const assetsDir = path.join(root, 'sagecut', 'brand-assets');
+  const assetsDir = path.join(root, 'clefcut', 'brand-assets');
   const logoFiles = []; const logoNotes = [];
   for (const c of cands.slice(0, 4)) {
     if (logoFiles.length >= 2) break;

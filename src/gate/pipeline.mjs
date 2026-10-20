@@ -20,7 +20,7 @@ import { loadBank, renderQuestion, askClef, judge, defaultBankPath } from './ban
 import { selectCriticFrames, writeCriticFrames, topMotionFrames } from './critic.mjs';
 import { median, roundHalfEven, mapLimit, windows, inWindows, rectsAt, designedWindows, declaredHolds } from './util.mjs';
 
-export const GATE_VERSION = `sagecut gate ${VERSION}`;
+export const GATE_VERSION = `clefcut gate ${VERSION}`;
 const JPEG_OVER = 1_500_000;
 
 export function effectWindows(sched) {
@@ -91,7 +91,7 @@ export async function runGate(opts) {
   // ----- inputs -----
   if (!fs.existsSync(video)) throw new Error(`Video not found: ${video}`);
   const schedPath = opts.schedulePath || config.schedulePath;
-  if (!fs.existsSync(schedPath)) throw new Error(`No schedule at ${schedPath}. Run "sagecut init", or pass --schedule FILE.`);
+  if (!fs.existsSync(schedPath)) throw new Error(`No schedule at ${schedPath}. Run "clefcut init", or pass --schedule FILE.`);
   let sched = loadSchedule(schedPath);
   const schedFrames = sched.frames;
   const brand = loadBrand(opts.brandPath || config.brandPath);
@@ -222,7 +222,7 @@ export async function runGate(opts) {
   if (brand) palette = brandPalette(brand);
   else if (sched.palette) palette = (Array.isArray(sched.palette) ? sched.palette : Object.values(sched.palette)).map((x) => String(x).toLowerCase());
   if (palette && palette.length) palette = [...new Set([...palette, '#ffffff', '#000000'])];
-  else { palette = null; skipped.push('Brand colour check skipped: no brand file with a palette (run "sagecut brand")'); }
+  else { palette = null; skipped.push('Brand colour check skipped: no brand file with a palette (run "clefcut brand")'); }
   const plab = palette ? paletteLab(palette) : null;
 
   const edgeRows = [], colourSeen = new Map(), clefGroups = [];

@@ -1,5 +1,5 @@
 node_modules/
 test/private/
-**/sagecut/qa/*/raw/
+**/clefcut/qa/*/raw/
 .env
 .DS_Store

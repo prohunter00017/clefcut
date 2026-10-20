@@ -1,6 +1,6 @@
 # Question bank
 
-Clef answers yes/no questions about images. SageCut asks a fixed set of questions in `gate`, `sweep` and `triage`. You can also ask your own with `sagecut ask`.
+Clef answers yes/no questions about images. ClefCut asks a fixed set of questions in `gate`, `sweep` and `triage`. You can also ask your own with `clefcut ask`.
 
 ## What a good question looks like
 
@@ -33,7 +33,7 @@ The plugin includes two question files in `assets/bank/`.
 | `gate-default.yaml` | `gate` | 8 questions about one prepared picture each: `staging_order`, `dead_frame`, `pop`, `abrupt_change`, `overlap`, `legible_feed`, `text_integrity` and `hierarchy`. Each has a kind, a picture type, the answer that fails, and a severity. The picture is a frame, a phone-size frame, a contact sheet of a beat, or a difference image of two frames. A null answer, or a scale answer near the pass line, goes to escalation. |
 | `sweep-default.json` | `sweep`, `triage` | Four problem questions (`cut`, `over`, `overlap`, `glitch`), one legibility question, a pass threshold, and the targeted triage questions with their width and control. |
 
-Use `sagecut gate <video> --bank FILE` to run a different gate question file. Use `question_bank` in `sagecut/sagecut.yaml` for a project default.
+Use `clefcut gate <video> --bank FILE` to run a different gate question file. In `clefcut/clefcut.yaml`, `question_bank` sets the project's gate file (YAML, like `gate-default.yaml`) and `sweep_bank` sets the project's sweep and triage file (JSON, like `sweep-default.json`). The two are different formats, so they are two keys.
 
 ## Controls
 
@@ -53,17 +53,17 @@ The tool picks a default control from the question. Use `--control` to choose an
 ## Ask your own question
 
 ```
-sagecut ask --images "sagecut/qa/<run>/img/*.png" --question "Is any text cut off by the edge of the frame?" --width 350 --control cut
+clefcut ask --images "clefcut/qa/<run>/img/*.png" --question "Is any text cut off by the edge of the frame?" --width 350 --control cut
 ```
 
 - `--width` sets the width at which Clef reads the frame. For legibility, use the test width of the brand.
-- The tool prints a table of results. The token use and cost of each run are logged in `sagecut/metrics/clef.jsonl`.
+- The tool prints a table of results. The token use and cost of each run are logged in `clefcut/metrics/clef.jsonl`.
 - A question about a defect that does not exist in your frames still needs a control. Without it, a row of "no" answers proves nothing.
 
 ## Rules
 
 1. Do not trust one Clef answer from one run. A measurement decides each open item.
-2. Put a project question set in the file that `question_bank` names in `sagecut/sagecut.yaml`. This is optional.
+2. Put a project question set in the files that `question_bank` (gate) and `sweep_bank` (sweep and triage) name in `clefcut/clefcut.yaml`. This is optional.
 3. Keep questions general. Do not name objects that only one video has.
 4. A "yes" without a measurement goes to the list of items to check. It is not yet a finding.
 5. Clef reads legibility at the test width. OCR reads at full resolution.

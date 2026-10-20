@@ -1,4 +1,4 @@
-// schedule.json: the single source of timing. The Remotion composition imports it, and SageCut checks against it.
+// schedule.json: the single source of timing. The Remotion composition imports it, and ClefCut checks against it.
 import fs from 'node:fs';
 
 const REQUIRED = ['film', 'fps', 'frames', 'width', 'height', 'safe_margin_px', 'beats', 'transitions'];

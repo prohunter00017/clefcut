@@ -1,6 +1,6 @@
 # Brand file format
 
-Each project has one brand file: `sagecut/brand.yaml`. The build and the QA both read it. `sagecut brand set` checks it and writes `src/brand.ts` and the font files.
+Each project has one brand file: `clefcut/brand.yaml`. The build and the QA both read it. `clefcut brand set` checks it and writes `src/brand.ts` and the font files.
 
 ## Fields
 
@@ -58,7 +58,7 @@ fonts:
     weights: [400]
 logo:
   files:
-    - sagecut/brand-assets/logo.svg
+    - clefcut/brand-assets/logo.svg
   min_px: 120
   clear_space: 24
 type:
@@ -84,7 +84,7 @@ source:
 
 ## Fonts in the build
 
-`src/brand.ts` imports `@remotion/fonts`. After `sagecut brand set`, if the project does not have it, run `npx remotion add @remotion/fonts`.
+`src/brand.ts` imports `@remotion/fonts`. After `clefcut brand set`, if the project does not have it, run `npx remotion add @remotion/fonts`.
 
 ## Order of authority
 
@@ -94,7 +94,7 @@ source:
 
 ## How the build uses the brand
 
-1. `sagecut brand set` writes `src/brand.ts` from `brand.yaml`.
+1. `clefcut brand set` writes `src/brand.ts` from `brand.yaml`.
 2. Each composition imports its colours and fonts from `src/brand.ts`. No colour is hard-coded.
 3. The fonts go into `public/fonts/`. A headless render cannot load web fonts.
 
@@ -113,13 +113,13 @@ source:
 
 | Source | Command | Notes |
 |---|---|---|
-| Website | `sagecut brand from-url <URL>` | Writes `sagecut/brand.draft.yaml` and downloads the logo files. It is a draft only. Show it to the user. |
-| Brand kit folder | `sagecut brand from-folder <PATH>` | Reads logo, font, guide and token files that it can parse. It is a draft only. |
+| Website | `clefcut brand from-url <URL>` | Writes `clefcut/brand.draft.yaml` and downloads the logo files. It is a draft only. Show it to the user. |
+| Brand kit folder | `clefcut brand from-folder <PATH>` | Reads logo, font, guide and token files that it can parse. It is a draft only. |
 | Five questions | Claude writes the draft | Ask for colours, font, logo, motion style and format. |
 | Riff | Claude writes the draft | See the riff rules below. |
-| Saved brand | `sagecut brand use <NAME>` | Loads a brand from `~/.sagecut/brands/`. |
+| Saved brand | `clefcut brand use <NAME>` | Loads a brand from `~/.clefcut/brands/`. |
 
-After the user approves a draft, run `sagecut brand set sagecut/brand.draft.yaml`. The user must have the right to use the brand files for the website and folder choices. Ask for this before you save.
+After the user approves a draft, run `clefcut brand set clefcut/brand.draft.yaml`. The user must have the right to use the brand files for the website and folder choices. Ask for this before you save.
 
 ## Riff rules
 

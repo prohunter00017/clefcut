@@ -20,7 +20,7 @@ const make = (out, { moving = false, after = '' } = {}) => {
   return spawnSync(tools.ffmpeg, args, { env: tools.env, encoding: 'utf8' });
 };
 const canMake = (() => {
-  const p = path.join(os.tmpdir(), `sagecut-probe-${process.pid}.mp4`);
+  const p = path.join(os.tmpdir(), `clefcut-probe-${process.pid}.mp4`);
   const ok = make(p, { moving: true }).status === 0;
   fs.rmSync(p, { force: true });
   return ok;
@@ -32,9 +32,9 @@ const SCHEDULE = { film: 'test', fps: 30, frames: 90, width: 320, height: 180, s
   transitions: [{ from: 'one', to: 'two', frames: [44, 50] }] };
 
 function project() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sagecut-gate-'));
-  fs.mkdirSync(path.join(root, 'sagecut'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'sagecut', 'schedule.json'), JSON.stringify(SCHEDULE));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'clefcut-gate-'));
+  fs.mkdirSync(path.join(root, 'clefcut'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'clefcut', 'schedule.json'), JSON.stringify(SCHEDULE));
   return root;
 }
 
@@ -70,12 +70,12 @@ test('gate: a clean video has no findings; brand motion.designed marks a flash a
   assert.equal(make(flash, { moving: true, after: BLACK('eq(n,40)') }).status, 0);
   const plain = await runGate({ video: flash, root, config: loadConfig(root), outDir: path.join(root, 'r1'), noClef: true, noOcr: true });
   assert.ok(plain.findings.some((f) => f.check === 'black_frames'));
-  fs.writeFileSync(path.join(root, 'sagecut', 'brand.yaml'), 'name: t\ncolors: { background: "#F4F0E5", text: "#0B1233", primary: "#1438D4" }\nfonts: { heading: { family: Geist } }\nmotion: { style: energetic, designed: [flash] }\n');
+  fs.writeFileSync(path.join(root, 'clefcut', 'brand.yaml'), 'name: t\ncolors: { background: "#F4F0E5", text: "#0B1233", primary: "#1438D4" }\nfonts: { heading: { family: Geist } }\nmotion: { style: energetic, designed: [flash] }\n');
   const undeclared = await runGate({ video: flash, root, config: loadConfig(root), outDir: path.join(root, 'r2a'), noClef: true, noOcr: true });
   assert.ok(undeclared.findings.some((f) => f.check === 'black_frames'));     // brand alone suppresses nothing
   assert.ok(undeclared.notes.some((n) => /brand allows flash; declare its frames in schedule effects/.test(n)));
   assert.match(summaryText(undeclared, null), /brand allows flash; declare its frames/);
-  fs.writeFileSync(path.join(root, 'sagecut', 'schedule.json'), JSON.stringify({ ...SCHEDULE, effects: [{ kind: 'flash', frames: [39, 42] }] }));
+  fs.writeFileSync(path.join(root, 'clefcut', 'schedule.json'), JSON.stringify({ ...SCHEDULE, effects: [{ kind: 'flash', frames: [39, 42] }] }));
   const designed = await runGate({ video: flash, root, config: loadConfig(root), outDir: path.join(root, 'r2'), noClef: true, noOcr: true });
   assert.ok(!designed.findings.some((f) => f.check === 'black_frames'));
   assert.ok(designed.designed.some((f) => f.check === 'black_frames' && f.designed_effect === 'flash'));
@@ -85,10 +85,10 @@ test('gate: a clean video has no findings; brand motion.designed marks a flash a
 });
 
 test('gate fails with a fix when the schedule or the video is missing', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sagecut-gate-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'clefcut-gate-'));
   await assert.rejects(runGate({ video: path.join(root, 'none.mp4'), root, config: loadConfig(root), outDir: path.join(root, 'o'), noClef: true }), /Video not found/);
   fs.writeFileSync(path.join(root, 'v.mp4'), 'x');
-  await assert.rejects(runGate({ video: path.join(root, 'v.mp4'), root, config: loadConfig(root), outDir: path.join(root, 'o'), noClef: true }), /No schedule at .*sagecut init/);
+  await assert.rejects(runGate({ video: path.join(root, 'v.mp4'), root, config: loadConfig(root), outDir: path.join(root, 'o'), noClef: true }), /No schedule at .*clefcut init/);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -120,10 +120,10 @@ test('gate: the Clef round asks every prepared picture, and the run records the 
   const root = project(), video = path.join(root, 'clean.mp4');
   assert.equal(make(video, { moving: true }).status, 0);
   fs.writeFileSync(path.join(root, '.env'), 'CLOUDFLARE_ACCOUNT_ID=acc-1\nCLOUDFLARE_API_TOKEN=tok-1\n');
-  const keys = ['SAGECUT_HOME', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLEF_MODEL'];
+  const keys = ['CLEFCUT_HOME', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLEF_MODEL'];
   const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   for (const k of keys) delete process.env[k];
-  process.env.SAGECUT_HOME = path.join(root, 'home');
+  process.env.CLEFCUT_HOME = path.join(root, 'home');
   const orig = globalThis.fetch; let calls = 0;
   globalThis.fetch = async (url, init) => {
     calls++;
@@ -150,10 +150,10 @@ test('sweep: a frame whose problem questions failed is NOT read, even when its l
   const root = project(), video = path.join(root, 'v.mp4');
   assert.equal(make(video, { moving: true }).status, 0);
   fs.writeFileSync(path.join(root, '.env'), 'CLOUDFLARE_ACCOUNT_ID=acc-1\nCLOUDFLARE_API_TOKEN=tok-1\n');
-  const keys = ['SAGECUT_HOME', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLEF_MODEL'];
+  const keys = ['CLEFCUT_HOME', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLEF_MODEL'];
   const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   for (const k of keys) delete process.env[k];
-  process.env.SAGECUT_HOME = path.join(root, 'home');
+  process.env.CLEFCUT_HOME = path.join(root, 'home');
   const orig = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     const b = JSON.parse(init.body), ids = Object.keys(b.questions);
@@ -177,10 +177,10 @@ test('sweep: a frame whose problem questions failed is NOT read, even when its l
 // Clef mocked: every yes/no "no" (p 0.03), every scale 3.8, or every request refused.
 async function withClef(root, mode, fn) {
   fs.writeFileSync(path.join(root, '.env'), 'CLOUDFLARE_ACCOUNT_ID=acc-1\nCLOUDFLARE_API_TOKEN=tok-1\n');
-  const keys = ['SAGECUT_HOME', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLEF_MODEL'];
+  const keys = ['CLEFCUT_HOME', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'CLEF_MODEL'];
   const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   for (const k of keys) delete process.env[k];
-  process.env.SAGECUT_HOME = path.join(root, 'home');
+  process.env.CLEFCUT_HOME = path.join(root, 'home');
   const orig = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     if (mode === 'refuse') return new Response(JSON.stringify({ success: false, errors: [{ message: 'bad input' }] }), { status: 400 });
@@ -200,7 +200,7 @@ test('gate: a render shorter than its schedule is a finding, and beats or transi
   const long = { ...SCHEDULE, frames: 240,
     beats: [...SCHEDULE.beats, { id: 'three', start: 90, end: 239, hold: [120, 239], elements: [{ id: 'box3', in: 95, text: 'Box' }] }],
     transitions: [...SCHEDULE.transitions, { from: 'two', to: 'three', frames: [100, 105] }] };
-  fs.writeFileSync(path.join(root, 'sagecut', 'schedule.json'), JSON.stringify(long));
+  fs.writeFileSync(path.join(root, 'clefcut', 'schedule.json'), JSON.stringify(long));
   const r = await withClef(root, 'answer', () => runGate({ video, root, config: loadConfig(root), outDir: path.join(root, 'r'), noOcr: true }));
   const fc = r.findings.find((f) => f.check === 'frame_count');
   assert.ok(fc, JSON.stringify(r.findings.map((f) => f.check)));
@@ -213,7 +213,7 @@ test('gate: a 4-frame video does not crash', { skip: !canMake && 'ffmpeg with la
   const root = project(), video = path.join(root, 'tiny.mp4');
   const p = spawnSync(tools.ffmpeg, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0xF4F0E5:s=320x180:r=30', '-frames:v', '4', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', video], { env: tools.env });
   assert.equal(p.status, 0);
-  fs.writeFileSync(path.join(root, 'sagecut', 'schedule.json'), JSON.stringify({ film: 't', fps: 30, frames: 4, width: 320, height: 180, safe_margin_px: 10, beats: [{ id: 'a', start: 0, end: 3, elements: [] }], transitions: [] }));
+  fs.writeFileSync(path.join(root, 'clefcut', 'schedule.json'), JSON.stringify({ film: 't', fps: 30, frames: 4, width: 320, height: 180, safe_margin_px: 10, beats: [{ id: 'a', start: 0, end: 3, elements: [] }], transitions: [] }));
   const r = await runGate({ video, root, config: loadConfig(root), outDir: path.join(root, 'r'), noClef: true, noOcr: true });
   assert.equal(r.video_info.frames, 4);
   fs.rmSync(root, { recursive: true, force: true });
@@ -224,7 +224,7 @@ test('gate: two off-palette colours on one frame are two findings with their own
   const p = spawnSync(tools.ffmpeg, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0xF4F0E5:s=320x180:r=30:d=3',
     '-vf', 'drawbox=x=20:y=20:w=90:h=70:color=0xD01010:t=fill,drawbox=x=200:y=90:w=90:h=70:color=0x10A040:t=fill', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-crf', '8', video], { env: tools.env });
   assert.equal(p.status, 0, p.stderr && p.stderr.toString());
-  fs.writeFileSync(path.join(root, 'sagecut', 'brand.yaml'), 'name: t\ncolors: { background: "#F4F0E5", text: "#0B1233", primary: "#1438D4" }\nfonts: { heading: { family: Geist } }\n');
+  fs.writeFileSync(path.join(root, 'clefcut', 'brand.yaml'), 'name: t\ncolors: { background: "#F4F0E5", text: "#0B1233", primary: "#1438D4" }\nfonts: { heading: { family: Geist } }\n');
   const r = await runGate({ video, root, config: loadConfig(root), outDir: path.join(root, 'r'), noClef: true, noOcr: true });
   const rows = r.findings.filter((f) => f.check === 'brand_colour');
   assert.equal(rows.length, 2, JSON.stringify(r.findings.map((f) => f.check)));
@@ -265,11 +265,58 @@ test('probe: a video with 90° display rotation reports the rotated size, as ffm
 
 test('frames(): a missing ffmpeg is a clear error, not an uncaught crash', async () => {
   const { frames } = await import('../../src/core/ffmpeg.mjs');
-  const saved = { a: process.env.SAGECUT_FFMPEG, b: process.env.SAGECUT_FFPROBE };
-  process.env.SAGECUT_FFMPEG = '/nonexistent/ffmpeg'; process.env.SAGECUT_FFPROBE = '/nonexistent/ffprobe';
+  const saved = { a: process.env.CLEFCUT_FFMPEG, b: process.env.CLEFCUT_FFPROBE };
+  process.env.CLEFCUT_FFMPEG = '/nonexistent/ffmpeg'; process.env.CLEFCUT_FFPROBE = '/nonexistent/ffprobe';
   try {
     await assert.rejects((async () => { for await (const f of frames('/x.mp4', { width: 8, height: 8, root: fs.mkdtempSync(path.join(os.tmpdir(), 'sc-ff-')) })) void f; })(), /could not start/);
   } finally {
-    for (const [k, v] of [['SAGECUT_FFMPEG', saved.a], ['SAGECUT_FFPROBE', saved.b]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    for (const [k, v] of [['CLEFCUT_FFMPEG', saved.a], ['CLEFCUT_FFPROBE', saved.b]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   }
+});
+
+test('review: one command runs gate, sweep, triage and numbers, writes review.json and review.md, exit 1 on findings', { skip: !canMake && 'ffmpeg with lavfi is not available' }, async () => {
+  const review = await import('../../src/commands/review.mjs');
+  const root = project(), video = path.join(root, 'v.mp4'), out = path.join(root, 'rv');
+  assert.equal(make(video, { moving: true, after: BLACK('between(n,40,41)') }).status, 0);
+  const chunks = []; let code;
+  await withClef(root, 'answer', async () => {
+    const log = console.log; console.log = (s) => chunks.push(String(s));
+    try { code = await review.run([video, '--step', '15', '--no-ocr', '--out', out, '--json'], { root, config: loadConfig(root) }); }
+    finally { console.log = log; }
+  });
+  assert.equal(code, 1);                                                   // the black frames are a gate finding
+  const j = JSON.parse(chunks.find((c) => c.startsWith('{')));
+  assert.ok(j.gate.findings >= 1 && j.findings.some((f) => f.check === 'black_frames'), JSON.stringify(j.gate));
+  assert.equal(j.sweep.frames_read, 6);
+  assert.ok(j.cost.clef_usd > 0);
+  for (const f of ['review.md', 'review.json', 'gate/findings.json', 'sweep/sweep.json']) assert.ok(fs.existsSync(path.join(out, f)), f);
+  assert.match(fs.readFileSync(path.join(out, 'review.md'), 'utf8'), /black_frames/);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('review --no-clef: measurements only, no sweep, no request', { skip: !canMake && 'ffmpeg with lavfi is not available' }, async () => {
+  const review = await import('../../src/commands/review.mjs');
+  const root = project(), video = path.join(root, 'v.mp4'), out = path.join(root, 'rv');
+  assert.equal(make(video, { moving: true }).status, 0);
+  const orig = globalThis.fetch; let calls = 0; globalThis.fetch = async () => { calls++; throw new Error('no network in this test'); };
+  const chunks = []; const log = console.log; console.log = (s) => chunks.push(String(s));
+  let code;
+  try { code = await review.run([video, '--no-clef', '--no-ocr', '--out', out, '--json'], { root, config: loadConfig(root) }); }
+  finally { console.log = log; globalThis.fetch = orig; }
+  const j = JSON.parse(chunks.find((c) => c.startsWith('{')));
+  assert.equal(calls, 0);
+  assert.equal(j.sweep, null);
+  assert.equal(code, j.gate.findings || j.gate.escalations ? 1 : 0);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('review stops before any work when the Cloudflare key is missing', async () => {
+  const review = await import('../../src/commands/review.mjs');
+  const root = project();
+  const keys = ['CLEFCUT_HOME', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  for (const k of keys) delete process.env[k];
+  process.env.CLEFCUT_HOME = path.join(root, 'home');
+  try { await assert.rejects(review.run([path.join(root, 'none.mp4')], { root, config: loadConfig(root) }), /No Cloudflare key/); }
+  finally { for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } fs.rmSync(root, { recursive: true, force: true }); }
 });

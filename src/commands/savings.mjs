@@ -1,4 +1,4 @@
-// sagecut savings show | session-start | stop: the savings ledger, and the two plugin hooks that use it.
+// clefcut savings show | session-start | stop: the savings ledger, and the two plugin hooks that use it.
 import { say } from '../core/log.mjs';
 import { readRows, readSession, totals, sessionLine, startSession, takeFresh } from '../core/savings.mjs';
 
@@ -17,10 +17,10 @@ export async function run(argv) {
     } catch { /* never fail the session */ }
     return 0;
   }
-  if (sub !== 'show') { console.error(`sagecut savings: unknown "${sub}". Use show, session-start or stop.`); return 2; }
+  if (sub !== 'show') { console.error(`clefcut savings: unknown "${sub}". Use show, session-start or stop.`); return 2; }
   const sess = readSession();
   const rows = readRows();
-  if (!rows.length) { say('No delivered video has savings yet. Savings appear after "sagecut numbers" runs on a video that Clef swept.'); return 0; }
-  say(sess ? sessionLine(totals(rows, sess.startedAt)) : sessionLine(totals(rows, null), 'SageCut, all videos'));
+  if (!rows.length) { say('No delivered video has savings yet. Savings appear after "clefcut numbers" runs on a video that Clef swept.'); return 0; }
+  say(sess ? sessionLine(totals(rows, sess.startedAt)) : sessionLine(totals(rows, null), 'ClefCut, all videos'));
   return 0;
 }

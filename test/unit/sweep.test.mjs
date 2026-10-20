@@ -137,3 +137,13 @@ test('sweep: --pmin must be a probability between 0 and 1', async () => {
   const sweep = await import('../../src/commands/sweep.mjs');
   await assert.rejects(sweep.run(['/nonexistent.mp4', '--pmin', '80'], { root: '.', config: { workers: 1 } }), /--pmin/);
 });
+
+test('sweep bank: question_bank (the gate YAML, per the docs) is not read by sweep; sweep_bank is', async () => {
+  const fs = (await import('node:fs')).default, os = (await import('node:os')).default, path = (await import('node:path')).default;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-bank-'));
+  fs.writeFileSync(path.join(root, 'gate.yaml'), 'questions:\n  - id: overlap\n    kind: yesno\n');
+  fs.writeFileSync(path.join(root, 'sweep.json'), JSON.stringify({ problems: { cut: 'Is a word cut off?' } }));
+  assert.ok(loadBank({ root, question_bank: 'gate.yaml' }).problems.glitch);              // the defaults, no JSON error
+  assert.deepEqual(Object.keys(loadBank({ root, question_bank: 'gate.yaml', sweep_bank: 'sweep.json' }).problems), ['cut']);
+  fs.rmSync(root, { recursive: true, force: true });
+});

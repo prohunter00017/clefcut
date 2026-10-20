@@ -1,4 +1,4 @@
-// sagecut check-schedule: schema, video facts and brand copy rules, before any render.
+// clefcut check-schedule: schema, video facts and brand copy rules, before any render.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -47,9 +47,9 @@ export function copyFindings(schedule, brand) {
 
 export async function run(argv, ctx) {
   const { values } = parseArgs({ args: argv, options: { video: { type: 'string' }, json: { type: 'boolean' }, root: { type: 'string' }, help: { type: 'boolean' } } });
-  if (values.help) { say('usage: sagecut check-schedule [--video FILE] [--json]'); return 0; }
+  if (values.help) { say('usage: clefcut check-schedule [--video FILE] [--json]'); return 0; }
   const file = ctx.config.schedulePath;
-  if (!fs.existsSync(file)) { console.error(`No schedule at ${path.relative(ctx.root, file)}. Run "sagecut init".`); return 2; }
+  if (!fs.existsSync(file)) { console.error(`No schedule at ${path.relative(ctx.root, file)}. Run "clefcut init".`); return 2; }
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { console.error(`${file} is not valid JSON: ${e.message}`); return 2; }
   const findings = validateSchedule(raw).map((m) => ({ level: 'error', where: 'schema', message: m }));

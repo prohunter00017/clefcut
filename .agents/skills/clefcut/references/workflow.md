@@ -1,13 +1,14 @@
-# SageCut QA
+# ClefCut QA
 
-SageCut gives a Remotion video three things: the house rules (a quality floor), your brand in every frame, and a fast and cheap QA. Code measures every frame. Clef reads every frame. The critics look only at the frames that SageCut selects. Claude opens a frame only when Clef and a measurement do not agree.
+ClefCut gives a Remotion video three things: the house rules (a quality floor), your brand in every frame, and a fast and cheap QA. Code measures every frame. Clef reads every frame. The critics look only at the frames that ClefCut selects. Claude opens a frame only when Clef and a measurement do not agree.
 
 ## How to run the tool
 
-1. Run the tool only as `node "<skill-directory>/scripts/sagecut.mjs" <command>`. Never use `npx` for the tool.
-2. Below, `sagecut` means that full command.
+1. Run the tool only as `node "<skill-directory>/scripts/clefcut.mjs" <command>`. Never use `npx` for the tool.
+2. Below, `clefcut` means that full command.
 3. Exit code 0 means pass. Exit code 1 means findings. Exit code 2 means an error. The message on stderr has the fix.
-4. Details are in the `references/` folder of this skill. Read a file only when you need it.
+4. `clefcut review <video>` runs the whole QA in one command (gate, sweep, triage, numbers) and writes `review.md` and `review.json`. Use `--step 3` or `--no-sweep` for a quick check of a draft, and the full review (`--step 1`, the default) on the file you deliver.
+5. Details are in the `references/` folder of this skill. Read a file only when you need it.
 
 | File | Use it for |
 |---|---|
@@ -21,7 +22,7 @@ SageCut gives a Remotion video three things: the house rules (a quality floor), 
 
 ## First use
 
-If `sagecut onboard status --json` shows `onboarded: false`, read and follow `references/setup.md` first. It shows the start screen and checks the key. Then continue here.
+If `clefcut onboard status --json` shows `onboarded: false`, read and follow `references/setup.md` first. It shows the start screen and checks the key. Then continue here.
 
 ## Before the first video
 
@@ -29,21 +30,21 @@ Do these steps once per project, before the first render. The setup flow does no
 
 ### Project
 
-1. If the folder is not a Remotion project (`sagecut onboard status --json` shows `isRemotionProject: false`), ask the user: make a new Remotion project here, or use an existing project folder (the user gives the path). For a new project, ask for a folder name. Then run `npx create-video@latest --yes --blank <folder>`. Then move into the new project folder and run `npm install` if `node_modules` is missing.
-2. Run `sagecut init`. It keeps all existing files. It prints a note about `tsconfig.json`. Set `"resolveJsonModule": true` in `compilerOptions` of `tsconfig.json`. Then the composition can import `sagecut/schedule.json`.
+1. If the folder is not a Remotion project (`clefcut onboard status --json` shows `isRemotionProject: false`), ask the user: make a new Remotion project here, or use an existing project folder (the user gives the path). For a new project, ask for a folder name. Then run `npx create-video@latest --yes --blank <folder>`. Then move into the new project folder and run `npm install` if `node_modules` is missing.
+2. Run `clefcut init`. It keeps all existing files. It prints a note about `tsconfig.json`. Set `"resolveJsonModule": true` in `compilerOptions` of `tsconfig.json`. Then the composition can import `clefcut/schedule.json`.
 
 ### Brand
 
-Do this only if `sagecut/brand.yaml` does not exist.
+Do this only if `clefcut/brand.yaml` does not exist.
 
-1. If the user has a saved brand, run `sagecut brand list`. Offer `sagecut brand use <NAME>`.
+1. If the user has a saved brand, run `clefcut brand list`. Offer `clefcut brand use <NAME>`.
 2. Else ask: "Which brand is this video for?" Give four options.
 
 | Option | What you do |
 |---|---|
-| From my website | Ask for the URL. Before you run it, say: "This reads the page's HTML and CSS only. It does not read styles built by JavaScript, and it gives no video format." Then run `sagecut brand from-url <URL>`. Show the coverage line. |
-| From a brand kit folder | Ask for the folder path. Run `sagecut brand from-folder <PATH>`. |
-| Answer 5 questions | Ask for colours, font, logo, motion style and format. Write `sagecut/brand.draft.yaml` yourself. |
+| From my website | Ask for the URL. Before you run it, say: "This reads the page's HTML and CSS only. It does not read styles built by JavaScript, and it gives no video format." Then run `clefcut brand from-url <URL>`. Show the coverage line. |
+| From a brand kit folder | Ask for the folder path. Run `clefcut brand from-folder <PATH>`. |
+| Answer 5 questions | Ask for colours, font, logo, motion style and format. Write `clefcut/brand.draft.yaml` yourself. |
 | No brand: riff on something | Do the riff steps below. |
 
 Reuse the brand information and approvals already supplied for this project.
@@ -52,7 +53,7 @@ Reuse the brand information and approvals already supplied for this project.
 
 1. Ask the user for something to riff on: a brand they like, a film, a game, a decade, a place or a mood.
 2. Make 3 style directions. Each has a palette in hex values (background, text, primary, one or two accents), a font pair with an open licence (for example the SIL Open Font License), a motion style (`restrained` or `energetic`) and one line of description.
-3. Ask the user to pick one. Write it to `sagecut/brand.draft.yaml` with the name `riff-<idea>` (lower case, hyphens), `source.kind: riff` and no logo.
+3. Ask the user to pick one. Write it to `clefcut/brand.draft.yaml` with the name `riff-<idea>` (lower case, hyphens), `source.kind: riff` and no logo.
 4. A riff takes the mood of the idea only. Never copy another company's logo, name or exact palette. Use fonts with an open licence only.
 
 The field list and a full example are in `references/brand-format.md`. Read it before you write a draft.
@@ -61,34 +62,31 @@ The field list and a full example are in `references/brand-format.md`. Read it b
 
 1. Show the result before you save it: the colours as hex values, the fonts, the logo file and the motion style.
 2. Ask the user to approve it or to change it. Change it until the user approves.
-3. Run `sagecut brand set sagecut/brand.draft.yaml`. This writes `sagecut/brand.yaml`, `src/brand.ts` and the font files, and saves the brand in `~/.sagecut/brands/`.
+3. Run `clefcut brand set clefcut/brand.draft.yaml`. This writes `clefcut/brand.yaml`, `src/brand.ts` and the font files, and saves the brand in `~/.clefcut/brands/`.
 4. `src/brand.ts` imports `@remotion/fonts`. If the project does not have it, run `npx remotion add @remotion/fonts`.
 
 ## The workflow
 
 Do these steps in order.
 
-1. **Doctor.** Run `sagecut doctor`. If the Cloudflare key is missing, tell the user to put `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in `.env`. Never ask for the token in the chat. If the project or the brand file is missing, do "Before the first video".
-2. **Init and schedule.** Run `sagecut init`. Write the timing in `sagecut/schedule.json`. Set a `role` on each text element. Declare each designed cut, flash or glitch in the schedule. Set `"resolveJsonModule": true` in `tsconfig.json`, then import the schedule in the composition. If the video has no sound on purpose, set `audio: none` in `sagecut/sagecut.yaml`. Run `sagecut check-schedule`. Fix each error before you render.
+1. **Doctor.** Run `clefcut doctor`. If the Cloudflare key is missing, tell the user to put `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in `.env`. Never ask for the token in the chat. If the project or the brand file is missing, do "Before the first video".
+2. **Init and schedule.** Run `clefcut init`. Write the timing in `clefcut/schedule.json`. Set a `role` on each text element. Declare each designed cut, flash or glitch in the schedule. Set `"resolveJsonModule": true` in `tsconfig.json`, then import the schedule in the composition. If the video has no sound on purpose, set `audio: none` in `clefcut/clefcut.yaml`. Run `clefcut check-schedule`. Fix each error before you render.
 3. **Render.** Run `npx remotion render <id> out/<name>.mp4 --codec h264 --crf 17 --color-space bt709`.
-4. **Gate.** Run `sagecut gate out/<name>.mp4`. Note the run folder. It has `findings.json`, `summary.md`, `contact.png` and `critic-frames/`.
+4. **Gate.** Run `clefcut gate out/<name>.mp4`. Note the run folder. It has `findings.json`, `summary.md`, `contact.png` and `critic-frames/`.
 5. **Findings.** For each finding, do these steps:
    1. Measure the frame (the finding gives the measurement).
-   2. Ask Clef with `sagecut ask`. A control is asked next to the frames.
+   2. Ask Clef with `clefcut ask`. A control is asked next to the frames.
    3. If Clef and the measurement agree, accept the result.
    4. If they do not agree, open the frame yourself. Record the open in `opened.json` (see "Opening a frame").
 6. **Critics.** Start the critics on the frames that `gate` selected (see "Critics"). Do not let them open other frames.
 7. **Fix.** Fix the defects. Render again. Run `gate` again. After 3 rounds, stop and report what is still open.
-8. **Deliver check.** Run `sagecut deliver-check out/<name>.mp4 --fix`. If it writes `out/<name>-delivery.mp4`, that is the final file. Else the final file is `out/<name>.mp4`.
-9. **Final QA.** On the final file (the exact file that you deliver), run `gate`, then `sweep`, then `triage`:
-   1. `sagecut gate <final file>`
-   2. `sagecut sweep <final file>`
-   3. `sagecut triage <sweep-run-dir> --video <final file>`
+8. **Deliver check.** Run `clefcut deliver-check out/<name>.mp4 --fix`. If it writes `out/<name>-delivery.mp4`, that is the final file. Else the final file is `out/<name>.mp4`.
+9. **Final QA.** On the final file (the exact file that you deliver), run `clefcut review <final file>`. It runs gate, sweep (every frame), triage and numbers, and writes `review.md` and `review.json` in its run folder, with `gate/` and `sweep/` inside. The same steps one by one: `clefcut gate <final file>`, `clefcut sweep <final file>`, `clefcut triage <sweep-run-dir> --video <final file>`.
 
    The sweep replaces the critics' frame-by-frame review. It is not an added step.
-10. **Numbers.** Run `sagecut numbers --runs <gate-run> <sweep-run> --critics-marker <marker>`. Every on-screen number about the QA comes from `sagecut/qa/numbers.json`. Before this step, write each frame that you opened yourself into `opened.json` in the gate run folder, as `{"images": [<frame numbers>]}`. The card counts only that file. No baseline is needed: the card estimates the Opus critics' side at the reference rate (see `references/cost-claims.md`).
+10. **Numbers.** Run `clefcut numbers --runs <review-run>/gate <review-run>/sweep --critics-marker <marker>` (or the gate and sweep run folders, if you ran the steps one by one). Every on-screen number about the QA comes from `clefcut/qa/numbers.json`. Before this step, write each frame that you opened yourself into `opened.json` in the gate run folder, as `{"images": [<frame numbers>]}`. The card counts only that file. No baseline is needed: the card estimates the Opus critics' side at the reference rate (see `references/cost-claims.md`).
 11. **Report.** Show the user before and after pictures. Write a short report: the defects that QA found, the corrections, the measured QA time and cost, and the number of frames that Claude opened. Read `references/cost-claims.md` before you write cost or time.
-12. **Savings.** At the end of every video, show the "Saved on this video" line that `sagecut numbers` printed. Copy it as it is. Do not change a number, and do not drop the word "estimate".
+12. **Savings.** At the end of every video, show the "Saved on this video" line that `clefcut numbers` printed. Copy it as it is. Do not change a number, and do not drop the word "estimate".
 
 ## The 9 rules
 
@@ -115,12 +113,12 @@ Never open a frame for comfort. Never open a frame that Clef and the measurement
 
 ## Critics
 
-Use three independent critics for full QA: craft, clarity, and freshness. Use Claude Code sub-agents when available and permitted by the task, following the user’s model preference. If independent critics cannot run, report that full QA and critic cost accounting are incomplete; do not invent their reviews or token usage.
+Use three independent critics for full QA: craft, clarity, and freshness. Start them as sub-agents when your agent can and the task permits it, following the user’s model preference. Without sub-agents, do the three passes yourself, one after the other, on the selected frames only, and report that the critics were not independent. If your model cannot see images, skip the critic passes, use `clefcut ask` where a frame would be opened, and report that the frame review was done by Clef and the measurements only. Never invent reviews or token usage.
 
-1. Put this line as the first line of each prompt: `SAGECUT-CRITIC-<run-id>`. The `<run-id>` is the name of the gate run folder. The tool uses this line to sum the critics' token usage.
+1. Put this line as the first line of each prompt: `CLEFCUT-CRITIC-<run-id>`. The `<run-id>` is the name of the gate run folder. The tool uses this line to sum the critics' token usage.
 2. Give each critic only these inputs:
    - the files in `critic-frames/` and `contact.png` of the gate run
-   - `sagecut/brand.yaml`
+   - `clefcut/brand.yaml`
    - `references/house-rules.md` (the rubric)
    - the exact file name and what changed since the last round
 3. Tell each critic not to open any other frame and not to read the other critics' reviews.
@@ -139,7 +137,7 @@ Use three independent critics for full QA: craft, clarity, and freshness. Use Cl
 
 Show this text if the user asks what the critics see:
 
-> The critics do not scroll through the whole video. SageCut measures every frame and Clef reads every frame first. The critics then look at the frames that SageCut picked, plus one contact sheet.
+> The critics do not scroll through the whole video. ClefCut measures every frame and Clef reads every frame first. The critics then look at the frames that ClefCut picked, plus one contact sheet.
 
 ## Brand and house rules
 
@@ -151,10 +149,10 @@ Show this text if the user asks what the critics see:
 
 ## Delivery
 
-1. Run `sagecut deliver-check` before the final QA. With `--fix`, it writes `<name>-delivery.mp4` when the colour range needs a correction. Deliver that file if it is written.
+1. Run `clefcut deliver-check` before the final QA. With `--fix`, it writes `<name>-delivery.mp4` when the colour range needs a correction. Deliver that file if it is written.
 2. Run the final QA (step 9) on the file that you deliver.
 3. If the user asks for a small change to a delivered video, read `references/splice.md`.
 
-## Limits in 0.3
+## Limits in 0.4
 
-- **Motion graphics only.** SageCut 0.3 is tested on motion graphics only. It is not tested on camera footage. The frozen-frame and colour checks may behave differently on camera footage. Do not promise results on camera footage.
+- **Motion graphics only.** ClefCut 0.4 is tested on motion graphics only. It is not tested on camera footage. The frozen-frame and colour checks may behave differently on camera footage. Do not promise results on camera footage.

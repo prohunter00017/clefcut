@@ -85,7 +85,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fatal = (message, status) => Object.assign(new Error(message), { fatal: true, status });
 
 export class ClefClient {
-  constructor({ root = process.cwd(), workers = 4, tag = 'sagecut', timeoutMs = 90_000 } = {}) {
+  constructor({ root = process.cwd(), workers = 4, tag = 'clefcut', timeoutMs = 90_000 } = {}) {
     const env = loadClefEnv(root);
     this.root = root; this.workers = Math.max(1, Math.trunc(workers) || 4); this.tag = tag; this.timeoutMs = timeoutMs;
     this.account = env.account; this.token = env.token; this.model = env.model; this.url = clefUrl(env.account, env.model);
@@ -93,13 +93,13 @@ export class ClefClient {
 
   // Commands call this first: it fails with the fix when the key or the model is wrong.
   check() {
-    if (!this.account || !this.token) throw fatal('No Cloudflare key. Put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env file or ~/.sagecut/.env (run "sagecut doctor").');
+    if (!this.account || !this.token) throw fatal('No Cloudflare key. Put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env file or ~/.clefcut/.env (run "clefcut doctor").');
     if (CLEF_INPUT_USD[this.model] == null) throw fatal(`CLEF_MODEL "${this.model}" is not a Clef model. Use one of: ${Object.keys(CLEF_INPUT_USD).join(', ')}.`);
   }
 
   async post(body, tries = 5) {
     this.check();
-    const headers = { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json', 'User-Agent': `sagecut/${VERSION}` };
+    const headers = { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json', 'User-Agent': `clefcut/${VERSION}` };
     const payload = JSON.stringify(body);
     for (let n = 0; n < tries; n++) {
       let r;
@@ -123,7 +123,7 @@ export class ClefClient {
 
   // There is no health route: ask one tiny question, which also checks the key.
   async ready() {
-    try { await this.post({ model: this.model, state: 'SageCut doctor check', questions: { q: { type: 'noul', instructions: 'Is this text a test?' } } }, 1); return { ok: true, status: 200 }; }
+    try { await this.post({ model: this.model, state: 'ClefCut doctor check', questions: { q: { type: 'noul', instructions: 'Is this text a test?' } } }, 1); return { ok: true, status: 200 }; }
     catch (e) { return { ok: false, status: e.status || 0, error: e.message }; }
   }
 
