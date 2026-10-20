@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadBank, isProblem, badAnswer } from '../../src/sweep/bank.mjs';
-import { flagRows, groupRuns, allRuns, typedFrames, onscreenFrames } from '../../src/sweep/runs.mjs';
-import { runControlled, safeDecide, pool, zeroUsage } from '../../src/sweep/controlled.mjs';
+import { flagRows, groupRuns, allRuns, typedFrames, onscreenFrames, frameStatus } from '../../src/sweep/runs.mjs';
+import { runControlled, pool, poolSettled, zeroUsage } from '../../src/sweep/controlled.mjs';
+import { parseRange } from '../../src/sweep/common.mjs';
 
 const schedule = {
   fps: 30, frames: 300,
@@ -74,15 +75,16 @@ function fakeClient(answerFor) {
   };
 }
 
-test('runControlled: control in every slice; ok when Sage finds the defect', async () => {
+test('runControlled: the control is asked once, next to the frames; ok when Clef finds the defect', async () => {
   const seen = [];
   const client = fakeClient((g) => { seen.push(g.id); return { answer: g.id === '__control_pos' ? 'yes' : 'no', p: g.id === '__control_pos' ? 0.95 : 0.05 }; });
   const items = Array.from({ length: 40 }, (_, i) => ({ id: `i${i}`, label: `i${i}`, media: 'data:x' }));
   const r = await runControlled(client, { items, variants: [{ id: 'q', instructions: 'Is it cut?' }], control: { kind: 'cut', pos: 'data:p', neg: 'data:n' }, bad: 'yes', pmin: 0.8 });
   assert.equal(r.rows.length, 40);
-  assert.equal(seen.filter((x) => x === '__control_pos').length, 3);      // 40 items / 18 per slice = 3 slices, each with the control
+  assert.equal(seen.filter((x) => x === '__control_pos').length, 1);
+  assert.equal(seen.filter((x) => x === '__control_neg').length, 1);
   assert.equal(r.controls.q.ok, true);
-  assert.equal(r.usage.calls, 3);
+  assert.equal(r.usage.calls, 1);
 });
 
 test('runControlled: a missed control marks the question not ok', async () => {
@@ -98,27 +100,40 @@ test('runControlled: no control means not verified', async () => {
   assert.equal(r.controls.q.ok, false);
 });
 
-test('safeDecide splits a failing batch and records single failures as errors', async () => {
-  const client = { async decide(groups) {
-    if (groups.some((g) => g.id === 'bad')) throw new Error('Sage /decide/batch HTTP 504: gateway');
-    return { rows: groups.map((g) => ({ id: g.id, label: g.id, answers: { q: { answer: 'no', p: 0.1 } } })), usage: { billed_input_tokens: 1, output_tokens: 0, image_tokens: 0, calls: 1 }, usd: 0, seconds: 0 };
-  } };
-  const groups = ['a', 'b', 'bad', 'c'].map((id) => ({ id, questions: [{ id: 'q' }] }));
-  const r = await safeDecide(client, groups);
-  assert.equal(r.rows.length, 4);
-  assert.ok(r.rows.find((x) => x.id === 'bad').answers.q.error);
-  assert.equal(r.rows.find((x) => x.id === 'a').answers.q.error, undefined);
-});
-
-test('safeDecide rethrows a rejected key', async () => {
-  const client = { async decide() { throw new Error('Sage rejected the key (HTTP 401). Check SAGE_API_KEY in .env.'); } };
-  await assert.rejects(() => safeDecide(client, [{ id: 'a', questions: [] }, { id: 'b', questions: [] }]), /rejected the key/);
-});
-
 test('pool keeps order and limits concurrency', async () => {
   let live = 0; let max = 0;
   const r = await pool([1, 2, 3, 4, 5, 6], 2, async (x) => { live++; max = Math.max(max, live); await new Promise((s) => setTimeout(s, 5)); live--; return x * 2; });
   assert.deepEqual(r, [2, 4, 6, 8, 10, 12]);
   assert.ok(max <= 2);
   assert.deepEqual(zeroUsage(), { billed_input_tokens: 0, output_tokens: 0, image_tokens: 0, calls: 0 });
+});
+
+test('parseRange: an inverted or empty range, or an unknown frame count, is an error', () => {
+  assert.deepEqual(parseRange('10-20', 100), [10, 20]);
+  assert.deepEqual(parseRange('90-200', 100), [90, 99]);
+  assert.deepEqual(parseRange(null, 100), [0, 99]);
+  assert.throws(() => parseRange('8-3', 100), /empty/);
+  assert.throws(() => parseRange('120-130', 100), /past the end/);
+  assert.throws(() => parseRange(null, NaN), /frame count/);
+});
+
+test('frameStatus: a frame is read only when every answer for it came back', () => {
+  const rows = [
+    { f: 1, q: 'cut', error: null }, { f: 1, q: 'legible', error: null },
+    { f: 2, q: 'cut', error: 'HTTP 500' }, { f: 2, q: 'legible', error: null },
+    { f: 3, q: 'cut', error: 'x' },
+  ];
+  const s = frameStatus(rows, [1, 2, 3, 4]);
+  assert.deepEqual([...s.read], [1]);
+  assert.deepEqual(s.failed, [2, 3, 4]);                // frame 4 has no answer at all
+});
+
+test('poolSettled: a failing item becomes an error entry; the others keep their order', async () => {
+  const r = await poolSettled([1, 2, 3], 2, async (x) => { if (x === 2) throw new Error('boom'); return x * 10; });
+  assert.deepEqual(r, [{ ok: true, value: 10 }, { ok: false, error: 'boom' }, { ok: true, value: 30 }]);
+});
+
+test('sweep: --pmin must be a probability between 0 and 1', async () => {
+  const sweep = await import('../../src/commands/sweep.mjs');
+  await assert.rejects(sweep.run(['/nonexistent.mp4', '--pmin', '80'], { root: '.', config: { workers: 1 } }), /--pmin/);
 });

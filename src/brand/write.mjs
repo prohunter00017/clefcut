@@ -52,8 +52,17 @@ export async function installFonts(brand, { root, brandDir }) {
     const weights = (f.weights && f.weights.length ? f.weights : [400]).map(Number);
     const files = {};
     try {
-      const local = f.file && [path.resolve(root, f.file), path.resolve(brandDir, f.file), path.resolve(root, 'public', f.file)].find((p) => fs.existsSync(p));
-      if (local) {
+      const findLocal = (rel) => rel && [path.resolve(root, rel), path.resolve(brandDir, rel), path.resolve(root, 'public', rel)].find((p) => fs.existsSync(p));
+      const local = findLocal(f.file);
+      const localSet = f.files && typeof f.files === 'object' ? Object.entries(f.files).map(([w, rel]) => [w, findLocal(rel)]) : [];
+      if (localSet.length && localSet.every(([, p]) => p)) {            // every weight is on disk (a saved brand, or a second "brand set")
+        for (const [w, p] of localSet) {
+          const dest = path.join(outDir, path.basename(p));
+          if (path.resolve(p) !== path.resolve(dest)) fs.copyFileSync(p, dest);
+          files[w] = `fonts/${path.basename(p)}`;
+        }
+        msgs.push(`${role}: ${f.family} (${Object.keys(files).join(', ')}) -> public/fonts/`);
+      } else if (local) {
         const dest = path.join(outDir, path.basename(local));
         if (path.resolve(local) !== path.resolve(dest)) fs.copyFileSync(local, dest);
         files[weights[0]] = `fonts/${path.basename(local)}`;
@@ -79,6 +88,7 @@ export async function installFonts(brand, { root, brandDir }) {
       f.file = files[first];
       f.files = files;
     } catch (e) {
+      delete f.file; delete f.files;                     // no font file that does not exist: brand.ts must not load it
       msgs.push(`WARNING ${role}: could not get ${f.family} (${e.message}). Add the font file to public/fonts/ and set fonts.${role}.file.`);
     }
   }
@@ -145,6 +155,31 @@ export const loadBrandFonts = () => Promise.all(FONT_FACES.map((f) => loadFont(f
 `;
 }
 
+// The saved copy in ~/.sagecut/brands/ carries its own logo and font files (brands/<slug>/...), with paths relative to
+// the brands folder, so "brand use" works in any project, even after the first project is gone.
+function saveBrand(brand, { root, brandDir }) {
+  const brands = ensureDir(path.join(userDataDir(), 'brands')), s = slug(brand.name), own = path.join(brands, s);
+  const copy = JSON.parse(JSON.stringify(brand));
+  const keep = (src, sub) => {
+    if (!src || !fs.existsSync(src)) return null;
+    const dest = path.join(ensureDir(path.join(own, sub)), path.basename(src));
+    if (path.resolve(src) !== path.resolve(dest)) fs.copyFileSync(src, dest);
+    return path.relative(brands, dest).split(path.sep).join('/');
+  };
+  const pub = (rel) => rel && path.resolve(root, 'public', rel);
+  for (const f of Object.values(copy.fonts || {})) {
+    if (!f || typeof f !== 'object') continue;
+    if (f.files && typeof f.files === 'object') for (const [w, rel] of Object.entries(f.files)) { const k = keep(pub(rel), 'fonts'); if (k) f.files[w] = k; }
+    if (f.file) { const k = keep(pub(f.file), 'fonts'); if (k) f.file = k; }
+  }
+  if (copy.logo && Array.isArray(copy.logo.files)) {
+    copy.logo.files = copy.logo.files.map((rel) => keep([path.resolve(root, rel), path.resolve(brandDir, rel)].find((p) => fs.existsSync(p)), 'logo') || rel);
+  }
+  const saved = path.join(brands, `${s}.yaml`);
+  fs.writeFileSync(saved, YAML.stringify(copy));
+  return saved;
+}
+
 export async function setBrand(file, { root, log = console.log }) {
   const brandDir = path.dirname(path.resolve(file));
   const brand = readBrandFile(file);
@@ -158,8 +193,7 @@ export async function setBrand(file, { root, log = console.log }) {
   fs.writeFileSync(dest, YAML.stringify(brand));
   ensureDir(path.join(root, 'src'));
   fs.writeFileSync(path.join(root, 'src', 'brand.ts'), brandTs(brand, logos.public));
-  const saved = path.join(ensureDir(path.join(userDataDir(), 'brands')), `${slug(brand.name)}.yaml`);
-  fs.writeFileSync(saved, YAML.stringify(brand));
+  const saved = saveBrand(brand, { root, brandDir });
   msgs.push(`wrote sagecut/brand.yaml, src/brand.ts and ${saved}`);
   for (const m of msgs) log(m);
   return { brand, messages: msgs, saved };

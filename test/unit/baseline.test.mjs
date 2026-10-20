@@ -104,3 +104,25 @@ test('buildPrompt: the marker is the first line; lists every frame; no personal 
   assert.ok(p.includes('Read tool'));
   assert.ok(!new RegExp(['chris' + 'topher', 'levan' + 'to', '/Us' + 'ers/'].join('|'), 'i').test(p));
 });
+
+test('parseSessionFile skips a null or non-object line instead of crashing', async () => {
+  const d = tmp(); const f = path.join(d, 'agent-n.jsonl');
+  fs.writeFileSync(f, ['null', '42', '"text"', asst('m1', { input_tokens: 1, output_tokens: 1 })].join('\n') + '\n');
+  assert.equal((await parseSessionFile(f)).turns, 1);
+  fs.rmSync(d, { recursive: true, force: true });
+});
+
+test('findMarkedFiles: a marker does not match a longer marker that starts with it', async () => {
+  const cfg = tmp();
+  const sub = path.join(cfg, 'projects', '-p', 's1', 'subagents');
+  fs.mkdirSync(sub, { recursive: true });
+  fs.writeFileSync(path.join(sub, 'agent-x.jsonl'), line({ type: 'user', message: { role: 'user', content: 'SAGECUT-CRITIC-gate-20261020-101500-2\nreview' } }) + '\n');
+  const old = process.env.CLAUDE_CONFIG_DIR; process.env.CLAUDE_CONFIG_DIR = cfg;
+  try {
+    assert.deepEqual(findMarkedFiles('SAGECUT-CRITIC-gate-20261020-101500'), []);
+    assert.equal(findMarkedFiles('SAGECUT-CRITIC-gate-20261020-101500-2').length, 1);
+  } finally {
+    if (old === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = old;
+    fs.rmSync(cfg, { recursive: true, force: true });
+  }
+});

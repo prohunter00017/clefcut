@@ -83,16 +83,47 @@ test('init writes the files and never overwrites', async () => {
 });
 
 test('doctor reports every check and masks the key', async () => {
-  const saved = process.env.SAGE_API_KEY; process.env.SAGE_API_KEY = 'sk-test-secret-1234';
+  const saved = { acc: process.env.CLOUDFLARE_ACCOUNT_ID, tok: process.env.CLOUDFLARE_API_TOKEN };
+  process.env.CLOUDFLARE_ACCOUNT_ID = 'acc-test'; process.env.CLOUDFLARE_API_TOKEN = 'cf-test-secret-1234';
   try {
     const checks = await doctor.checks(ctx());
     const names = checks.map((c) => c.name);
-    for (const n of ['node', 'ffmpeg', 'sage key', 'sage server', 'ocr', 'brand', 'schedule']) assert.ok(names.includes(n), n);
+    for (const n of ['node', 'ffmpeg', 'clef key', 'clef model', 'ocr', 'brand', 'schedule']) assert.ok(names.includes(n), n);
     assert.ok(!JSON.stringify(checks).includes('secret'));
-    assert.match(checks.find((c) => c.name === 'sage key').detail, /1234/);
+    assert.match(checks.find((c) => c.name === 'clef key').detail, /1234/);
     assert.equal(checks.find((c) => c.name === 'node').status, 'pass');
     assert.equal(checks.find((c) => c.name === 'ocr').status, 'pass');
-  } finally { if (saved === undefined) delete process.env.SAGE_API_KEY; else process.env.SAGE_API_KEY = saved; }
+  } finally {
+    for (const [k, v] of [['CLOUDFLARE_ACCOUNT_ID', saved.acc], ['CLOUDFLARE_API_TOKEN', saved.tok]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
 });
 
 test('cleanup', () => { fs.rmSync(tmp, { recursive: true, force: true }); });
+
+test('cli: the savings hooks never fail on a broken sagecut.yaml (a Stop hook exit 2 blocks the agent)', () => {
+  const p = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-hook-'));
+  fs.mkdirSync(path.join(p, 'sagecut'), { recursive: true });
+  fs.writeFileSync(path.join(p, 'sagecut', 'sagecut.yaml'), 'brand: [unclosed\n\tbad: tab\n');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'src', 'cli.mjs'), 'savings', 'stop'], { cwd: p, encoding: 'utf8', env: { ...process.env, SAGECUT_HOME: path.join(p, 'home') } });
+  assert.equal(r.status, 0, r.stderr);
+  fs.rmSync(p, { recursive: true, force: true });
+});
+
+test('cli: --root=DIR works like --root DIR', () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-root-')), here = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-cwd-'));
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'src', 'cli.mjs'), 'init', `--root=${target}`], { cwd: here, encoding: 'utf8', env: { ...process.env, SAGECUT_HOME: path.join(here, 'home') } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(fs.existsSync(path.join(target, 'sagecut', 'schedule.json')));
+  assert.ok(!fs.existsSync(path.join(here, 'sagecut')));
+  fs.rmSync(target, { recursive: true, force: true }); fs.rmSync(here, { recursive: true, force: true });
+});
+
+test('init: the schedule skeleton ends on the last frame, not one past it', async () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-init-'));
+  await capture(() => init.run(['--frames', '300'], { root: d, config: loadConfig(d) }));
+  const s = JSON.parse(fs.readFileSync(path.join(d, 'sagecut', 'schedule.json'), 'utf8'));
+  assert.equal(s.beats[0].end, 299);
+  assert.equal(s.beats[0].elements[0].out, 299);
+  assert.deepEqual(validateSchedule(s), []);
+  fs.rmSync(d, { recursive: true, force: true });
+});

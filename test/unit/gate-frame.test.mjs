@@ -65,3 +65,9 @@ test('maskInkCheck: thick ink-coloured strokes near a mask', () => {
   assert.equal(maskInkCheck(img, [{ id: 'hand', rect: [0, 0, 98, 300], frames: [20, 30] }], 10, '#0B1233').length, 0);
   assert.equal(maskInkCheck(img, [{ id: 'far', rect: [0, 0, 40, 300] }], 10, '#0B1233').length, 0);
 });
+
+test('edgeCheck: allowed edge contact is exempt to the last pixel when the size is not a multiple of 4', () => {
+  const img = canvas(402, 302, PAPER);
+  rect(img, 300, 200, 402, 302, INK);                      // a card that bleeds off the bottom-right corner
+  assert.deepEqual(edgeCheck(img, 20, new Set(['bottom', 'right'])).res, {});
+});

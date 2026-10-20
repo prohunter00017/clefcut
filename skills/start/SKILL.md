@@ -1,6 +1,6 @@
 ---
 name: start
-description: SageCut start screen. Shows the SageCut artwork and a short explainer, checks the Sage key, and tells the user to begin their video work. Use when the user types /sagecut:start, asks to set up SageCut, or starts Remotion work before SageCut is set up.
+description: SageCut start screen. Shows the SageCut artwork and a short explainer, checks the Cloudflare key, and tells the user to begin their video work. Use when the user types /sagecut:start, asks to set up SageCut, or starts Remotion work before SageCut is set up.
 license: MIT
 compatibility: Requires Claude Code, Node 18 or later, and a Remotion 4 project (the qa skill can create one). Windows x64, macOS and Linux.
 metadata:
@@ -12,7 +12,7 @@ allowed-tools: Bash(node *)
 
 # SageCut start
 
-This skill shows the start screen, checks the Sage key, and hands over to the user's video work. It has no menu and no test video. The brand and the project come at the start of the first video (the `qa` skill).
+This skill shows the start screen, checks the Cloudflare key, and hands over to the user's video work. It has no menu and no test video. The brand and the project come at the start of the first video (the `qa` skill).
 
 ## Rules for this skill
 
@@ -30,16 +30,16 @@ This skill shows the start screen, checks the Sage key, and hands over to the us
 
 Show this text:
 
-> SageCut checks your Remotion videos while you build them. Code measures every frame, and the Sage decision model reads every frame, at a fraction of a cent per frame. Your critics look only at the frames that SageCut picks, and Claude opens a frame only when Sage and a measurement disagree. At the end of every video, SageCut shows what it saved you.
+> SageCut checks your Remotion videos while you build them. Code measures every frame, and the Clef decision model reads every frame, at a fraction of a cent per frame. Your critics look only at the frames that SageCut picks, and Claude opens a frame only when Clef and a measurement disagree. At the end of every video, SageCut shows what it saved you.
 
-## Step 2: Sage key
+## Step 2: Cloudflare key
 
 1. Run `sagecut onboard status --json`. Read `hasKey` and `keyPage`.
 2. If `hasKey` is false, show this text, and give the `keyPage` address if it has a value:
 
 Show this text:
 
-> SageCut needs a Sage key. Make one at levanto.ai, then put it in your project's .env file as SAGE_API_KEY=… (or in ~/.sagecut/.env to use one key in all your projects). Tell me when it is there.
+> SageCut asks the Clef decision model on Cloudflare Workers AI. Make an API token with the Workers AI template at dash.cloudflare.com/profile/api-tokens, then put CLOUDFLARE_ACCOUNT_ID=… and CLOUDFLARE_API_TOKEN=… in your project's .env file (or in ~/.sagecut/.env to use them in all your projects). Tell me when they are there.
 
 3. Wait for the user. Then run `sagecut doctor`.
 4. If `hasKey` is true, run `sagecut doctor` at once.
@@ -59,9 +59,9 @@ Stop here. The `qa` skill takes over when the user starts, renders, reviews or d
 
 ## Savings
 
-`sagecut numbers` adds one row to the savings ledger (`~/.sagecut/savings.jsonl`) for each video that Sage swept. The row compares two things for the same frames:
+`sagecut numbers` adds one row to the savings ledger (`~/.sagecut/savings.jsonl`) for each video that Clef swept. The row compares two things for the same frames:
 
-- SageCut: the measured Sage cost and the critics' cost, and the measured QA time.
+- SageCut: the measured Clef cost and the critics' cost, and the measured QA time.
 - Opus critics viewing the same frames: an estimate at the rate measured on Levanto's reference build, $0.101 and 8.6 s per frame viewed (15 Opus 5.5 critics made 1,009 frame views (358 distinct frames) for $101.96 in 2.41 h). It comes from another film, so it is an estimate, never a measurement of the user's video.
 
 Rules for every savings line:

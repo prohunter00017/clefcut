@@ -1,4 +1,4 @@
-// Measurements for triage that need no Sage call.
+// Measurements for triage that need no Clef call.
 import { decodeFrame } from './images.mjs';
 import { pool } from './controlled.mjs';
 
@@ -31,7 +31,9 @@ const toGray = ({ rgb, w, h }) => {
 };
 
 export async function popRatio(video, { root, fps, total, run }) {
-  const list = run.list.length > 100 ? [run.ask_frame] : run.list;
+  // a defect that stays on screen has no one-frame pop, so a long run is never cleared by this measure
+  if (run.list.length > 100) return { ratio: null, pop: null, frame: null, reason: `the run is too long (${run.list.length} flagged frames) for the one-frame pop measure` };
+  const list = run.list;
   const lo = Math.max(0, Math.min(...list) - 17); const hi = Math.min(total - 1, Math.max(...list) + 17);
   const nums = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
   const decoded = await pool(nums, 6, (f) => decodeFrame(video, f, { root, width: 480, fps }));

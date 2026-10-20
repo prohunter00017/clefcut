@@ -4,7 +4,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { qaDir } from '../core/paths.mjs';
 import { readJson, writeJson, say, setQuiet } from '../core/log.mjs';
-import { sageUsd } from '../core/sage.mjs';
+import { clefUsd, DEFAULT_MODEL } from '../core/clef.mjs';
 import { HOUSE_REVIEW } from '../core/costs.mjs';
 import { measureMarker } from '../claude/sessions.mjs';
 import { fmtUsd, fmtSeconds } from '../core/format.mjs';
@@ -13,8 +13,8 @@ import { savingsRow, upsertRow, deliveryLine } from '../core/savings.mjs';
 export const help = 'Write the measured QA numbers and the results card (numbers.json, card.md).';
 
 export const ESTIMATE_METHOD = (n) => `estimate from ${n} measured frames, Claude API list prices`;
-export const HOUSE_METHOD = `estimate: Opus 5.5 critics viewing the same frames, at the rate measured on Levanto's reference build ($${HOUSE_REVIEW.usd_per_frame} and ${HOUSE_REVIEW.seconds_per_frame} s per frame view: ${HOUSE_REVIEW.source}), scaled linearly to the frames Sage read; another film, not a measurement of this video; Claude API list prices`;
-const runUsd = (r, plan) => (r?.usage ? sageUsd(r.usage, r.plan || plan) : (r?.usd || 0));
+export const HOUSE_METHOD = `estimate: Opus 5.5 critics viewing the same frames, at the rate measured on Levanto's reference build ($${HOUSE_REVIEW.usd_per_frame} and ${HOUSE_REVIEW.seconds_per_frame} s per frame view: ${HOUSE_REVIEW.source}), scaled linearly to the frames Clef read; another film, not a measurement of this video; Claude API list prices`;
+const runUsd = (r, model) => (r?.usage ? clefUsd(r.usage, r.model || model) : (r?.usd || 0));
 
 const exists = (p) => { try { return fs.existsSync(p); } catch { return false; } };
 const dirsOf = (qa, prefix) => { try { return fs.readdirSync(qa, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name.startsWith(prefix)).map((d) => path.join(qa, d.name)).sort(); } catch { return []; } };
@@ -28,23 +28,38 @@ export function openedImages(file) {
 export { fmtUsd, fmtSeconds };
 
 // Pure: the numbers object from what the files hold. Used by the command and by the unit tests.
-export function computeNumbers({ sweeps = [], triages = [], gates = [], opened = [], openedRecorded = opened.length > 0, critics = null, baseline = null, plan = 'developer' }) {
+// Frames a sweep read: its range and step minus the failed frames; null for an older run file without a range.
+function framesOf(s) {
+  if (!Array.isArray(s.range) || !(s.step >= 1)) return null;
+  const failed = new Set(s.failed_frames || []), out = [];
+  for (let f = s.range[0]; f <= s.range[1]; f += s.step) if (!failed.has(f)) out.push(f);
+  return out;
+}
+
+// The union of the frames all sweeps read (a re-run of failed frames adds them; two halves add up).
+function framesRead(sweeps) {
+  const union = new Set(); let legacy = 0;
+  for (const s of sweeps) { const fr = framesOf(s); if (fr) fr.forEach((f) => union.add(f)); else legacy = Math.max(legacy, s.frames_read || 0); }
+  return Math.max(union.size, legacy);
+}
+
+export function computeNumbers({ sweeps = [], triages = [], gates = [], opened = [], openedRecorded = opened.length > 0, critics = null, baseline = null, model = DEFAULT_MODEL }) {
   const shas = new Set([...sweeps, ...gates].map((x) => x.video_sha256_12).filter(Boolean));
   if (baseline && baseline.video_sha256_12) shas.add(baseline.video_sha256_12);
   const out = { problems: [], video_sha256_12: shas.size === 1 ? [...shas][0] : null };
   if (shas.size > 1) out.problems.push(`the runs come from ${shas.size} different videos (${[...shas].join(', ')}); numbers from different videos are never added`);
-  const sweepUsd = sweeps.reduce((a, s) => a + runUsd(s, plan), 0);
-  const triageUsd = triages.reduce((a, t) => a + runUsd(t, plan), 0);
+  const sweepUsd = sweeps.reduce((a, s) => a + runUsd(s, model), 0);
+  const triageUsd = triages.reduce((a, t) => a + runUsd(t, model), 0);
   const gateTokens = (g) => (g.billed_input_tokens || 0) + (g.image_tokens || 0) + (g.output_tokens || 0);
-  const gateUsd = gates.reduce((a, g) => a + (gateTokens(g) ? sageUsd({ billed_input_tokens: g.billed_input_tokens, image_tokens: g.image_tokens, output_tokens: g.output_tokens }, g.plan || plan) : (g.usd || 0)), 0);
+  const gateUsd = gates.reduce((a, g) => a + (gateTokens(g) ? clefUsd({ billed_input_tokens: g.billed_input_tokens, image_tokens: g.image_tokens, output_tokens: g.output_tokens }, g.model || model) : (g.usd || 0)), 0);
   const seconds = [...sweeps, ...triages, ...gates].reduce((a, r) => a + (r.seconds || 0), 0);
   const distinct = new Set(opened);
   out.sagecut = {
-    frames_read: sweeps.length ? Math.max(...sweeps.map((s) => s.frames_read || 0)) : 0,
+    frames_read: framesRead(sweeps),
     qa_seconds: Number(seconds.toFixed(1)),
-    sage_usd: Number((sweepUsd + triageUsd + gateUsd).toFixed(6)),
-    sage_usd_parts: { sweep: Number(sweepUsd.toFixed(6)), triage: Number(triageUsd.toFixed(6)), gate: Number(gateUsd.toFixed(6)) },
-    sage_plan: plan,
+    clef_usd: Number((sweepUsd + triageUsd + gateUsd).toFixed(6)),
+    clef_usd_parts: { sweep: Number(sweepUsd.toFixed(6)), triage: Number(triageUsd.toFixed(6)), gate: Number(gateUsd.toFixed(6)) },
+    clef_model: model,
     critics_usd: critics ? critics.usd : null,
     critics_price_unknown: critics ? critics.price_unknown : [],
     critics_tokens: critics ? critics.tokens : null,
@@ -53,8 +68,8 @@ export function computeNumbers({ sweeps = [], triages = [], gates = [], opened =
     critics_distinct_images: critics ? critics.distinct_images : null,
     frames_opened_by_claude: openedRecorded ? distinct.size : null,   // null: no opened.json, so nothing was recorded
     critics_seconds: critics && Number.isFinite(critics.seconds) ? Number(critics.seconds.toFixed(1)) : null,
-    sage_asked: gates.reduce((a, g) => a + (g.sage_asked || 0), 0),
-    sage_errors: gates.reduce((a, g) => a + (g.sage_errors || 0), 0),
+    clef_asked: gates.reduce((a, g) => a + (g.clef_asked || 0), 0),
+    clef_errors: gates.reduce((a, g) => a + (g.clef_errors || 0), 0),
   };
   const sum = (xs) => (xs.length ? Number(xs.reduce((a, x) => a + (x || 0), 0).toFixed(1)) : null);
   out.time_by_step = {
@@ -89,7 +104,7 @@ export function computeNumbers({ sweeps = [], triages = [], gates = [], opened =
   } else out.old_review_estimate = null;
   out.baseline_note = out.old_review_estimate ? null
     : out.problems.length ? 'the runs are not all from the same video: no comparison is shown'
-      : !out.sagecut.frames_read ? 'no sweep: Sage read no frames, so no comparison is shown'
+      : !out.sagecut.frames_read ? 'no sweep: Clef read no frames, so no comparison is shown'
         : `the baseline model has no list price (${(b.price_unknown || []).join(', ')}): no comparison is shown`;
   return out;
 }
@@ -97,13 +112,13 @@ export function computeNumbers({ sweeps = [], triages = [], gates = [], opened =
 export function renderCard(n, runsUsed) {
   const s = n.sagecut; const L = ['# SageCut results', ''];
   L.push('## SageCut (measured)', '');
-  L.push(`- Frames Sage read: ${s.frames_read}`);
+  L.push(`- Frames Clef read: ${s.frames_read}`);
   L.push(`- QA time: ${fmtSeconds(s.qa_seconds)}`);
-  L.push(`- Sage cost: ${fmtUsd(s.sage_usd)} (${s.sage_plan} plan rate)`);
+  L.push(`- Clef cost: ${fmtUsd(s.clef_usd)} (${s.clef_model} model rate)`);
   L.push(`- Critics' cost: ${s.critics_usd === null ? (s.critics_price_unknown.length ? `price unknown for ${s.critics_price_unknown.join(', ')}` : 'not measured') : `${fmtUsd(s.critics_usd)} at Claude API list prices`}`);
   L.push(s.frames_opened_by_claude === null ? '- Frames recorded as opened by Claude: not recorded (no opened.json in the run)' : `- Frames recorded as opened by Claude (from opened.json): ${s.frames_opened_by_claude}`);
   if (s.critics_image_views !== null) L.push(`- Critics' image views: ${s.critics_image_views} (${s.critics_distinct_images} different images)`);
-  if (s.sage_asked) L.push(`- Sage questions with no answer (errors): ${s.sage_errors} of ${s.sage_asked}`);
+  if (s.clef_asked) L.push(`- Clef questions with no answer (errors): ${s.clef_errors} of ${s.clef_asked}`);
   if (n.triage) L.push(`- Open items after triage: ${Object.entries(n.triage.counts).map(([k, v]) => `${v} ${k}`).join(', ')}`);
   L.push('');
   L.push('## The old review of the same frames (estimate)', '');
@@ -113,8 +128,8 @@ export function renderCard(n, runsUsed) {
     L.push(`- Cost: ${fmtUsd(e.usd)} (estimate)`);
     L.push(`- Method: ${e.method}.`);
     L.push(e.reference === 'house'
-      ? `- The same ${e.frames} frames that Sage read, at ${fmtUsd(e.usd_per_frame)} and ${e.seconds_per_frame} s per frame view (the reference build's rate, scaled linearly).`
-      : `- The same ${e.frames} frames that Sage read; ${fmtSeconds(e.seconds_per_frame)} and ${fmtUsd(e.usd_per_frame)} per frame, measured on ${e.baseline_frames} frames.`);
+      ? `- The same ${e.frames} frames that Clef read, at ${fmtUsd(e.usd_per_frame)} and ${e.seconds_per_frame} s per frame view (the reference build's rate, scaled linearly).`
+      : `- The same ${e.frames} frames that Clef read; ${fmtSeconds(e.seconds_per_frame)} and ${fmtUsd(e.usd_per_frame)} per frame, measured on ${e.baseline_frames} frames.`);
   } else L.push(`- ${n.baseline_note || 'not available'}.`);
   const tb = n.time_by_step || {};
   const step = (label, v) => `- ${label}: ${v === null || v === undefined ? 'not measured' : fmtSeconds(v)}`;
@@ -151,7 +166,7 @@ export async function run(argv, { root, config }) {
   }
   if (values.json) setQuiet(true);
   const qa = qaDir(root);
-  let runDirs = (values.runs || []).map((d) => path.resolve(d));
+  let runDirs = [...new Set((values.runs || []).map((d) => path.resolve(d)))];       // a folder given twice counts once
   if (!runDirs.length) {
     const sw = dirsOf(qa, 'sweep-').filter((d) => exists(path.join(d, 'sweep.json'))).pop();
     const gt = dirsOf(qa, 'gate-').filter((d) => exists(path.join(d, 'findings.json'))).pop();
@@ -166,9 +181,9 @@ export async function run(argv, { root, config }) {
     if (exists(path.join(d, 'sweep.json'))) { const j = readJson(path.join(d, 'sweep.json')); sweeps.push({ ...j, rows: undefined }); used.push(`${rel}/sweep.json`); hit = true; }
     if (exists(path.join(d, 'triage.json'))) { triages.push(readJson(path.join(d, 'triage.json'))); used.push(`${rel}/triage.json`); hit = true; }
     if (exists(path.join(d, 'findings.json'))) {
-      const f = readJson(path.join(d, 'findings.json')); const sg = f.sage || {};
-      gates.push({ video: f.video, video_sha256_12: f.video_sha256_12, usd: sg.usd, billed_input_tokens: sg.billed_input_tokens || 0, image_tokens: sg.image_tokens || 0, output_tokens: sg.output_tokens || 0, seconds: Number(f.seconds || 0),
-        sage_asked: f.sage_asked || 0, sage_errors: (f.sage_errors || []).length });
+      const f = readJson(path.join(d, 'findings.json')); const sg = f.clef || {};
+      gates.push({ video: f.video, video_sha256_12: f.video_sha256_12, usd: sg.usd, billed_input_tokens: sg.billed_input_tokens || 0, image_tokens: sg.image_tokens || 0, output_tokens: sg.output_tokens || 0, model: sg.model, seconds: Number(f.seconds || 0),
+        clef_asked: f.clef_asked || 0, clef_errors: (f.clef_errors || []).length });
       used.push(`${rel}/findings.json`); hit = true;
     }
     for (const of of [path.join(d, 'opened.json'), path.join(d, 'triage', 'opened.json')]) {
@@ -188,14 +203,14 @@ export async function run(argv, { root, config }) {
   else if (bdir) throw new Error(`no baseline.json in ${bdir}. Run "sagecut baseline measure <marker>" first.`);
   if (!baseline) used.push(`reference rate for the old review: src/core/costs.mjs HOUSE_REVIEW (${HOUSE_REVIEW.source})`);
 
-  const n = computeNumbers({ sweeps, triages, gates, opened, openedRecorded, critics, baseline, plan: config.plan });
+  const n = computeNumbers({ sweeps, triages, gates, opened, openedRecorded, critics, baseline });
   n.generated = new Date().toISOString();
   n.sources = used;
   writeJson(path.join(qa, 'numbers.json'), n);
   const card = renderCard(n, used);
   fs.writeFileSync(path.join(qa, 'card.md'), card);
   // A delivered film version: one ledger row per video hash, replaced when the numbers are run again.
-  const row = n.problems.length ? null : savingsRow(n, { video: gates.find((g) => g.video)?.video });
+  const row = n.problems.length ? null : savingsRow(n, { video: gates.find((g) => g.video)?.video || sweeps.find((s) => s.video)?.video });
   if (row) upsertRow(row);
   if (values.json) console.log(JSON.stringify(n));
   else { say(card); if (row) say(deliveryLine(row)); }

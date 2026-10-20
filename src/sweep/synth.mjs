@@ -116,6 +116,7 @@ export function makeOffbrand(f, palette) {
 export const CONTROL_KINDS = ['cut', 'black', 'frozen', 'ghost', 'offbrand'];
 
 export function makeControl(kind, frame, { palette = [] } = {}) {
+  if (kind == null || kind === 'none') return null;
   switch (kind) {
     case 'black': return makeBlack(frame);
     case 'frozen': return makeFrozen(frame);

@@ -59,7 +59,7 @@ The `frames` pair is the first and last frame of the transition. The QA checks t
 
 ## Tolerance
 
-Triage uses the schedule windows with a tolerance of 15 frames. A flag inside a window (plus or minus 15 frames) of an element, a transition or a hold has an explanation. A flag outside all windows stays on the list for a targeted Sage question.
+Triage uses the schedule windows with a tolerance of 15 frames. A flag inside a window (plus or minus 15 frames) of an element, a transition or a hold has an explanation. A flag outside all windows stays on the list for a targeted Clef question.
 
 ## Full example
 
@@ -88,7 +88,7 @@ A 10-second video at 30 fps with three beats.
       "end": 209,
       "elements": [
         { "id": "proof-number", "in": 100, "out": 200, "text": "Every frame checked" },
-        { "id": "proof-caption", "in": 120, "out": 200, "text": "Measured, then read by Sage" }
+        { "id": "proof-caption", "in": 120, "out": 200, "text": "Measured, then read by Clef" }
       ]
     },
     {
@@ -131,7 +131,7 @@ These keys are in `sagecut/sagecut.yaml`:
 |---|---|
 | `audio` | `auto` (default), `required` or `none`. With `auto`, a missing audio stream is a warning. Set `none` for a video that is silent by design. |
 | `test_width` | Overrides the test width of the brand format. |
-| `workers` | Parallel Sage requests. |
+| `workers` | Parallel Clef requests. |
 | `question_bank` | A project question file. |
 | `composition` | The Remotion composition id. |
 

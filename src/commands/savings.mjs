@@ -20,7 +20,7 @@ export async function run(argv) {
   if (sub !== 'show') { console.error(`sagecut savings: unknown "${sub}". Use show, session-start or stop.`); return 2; }
   const sess = readSession();
   const rows = readRows();
-  if (!rows.length) { say('No delivered video has savings yet. Savings appear after "sagecut numbers" runs on a video that Sage swept.'); return 0; }
+  if (!rows.length) { say('No delivered video has savings yet. Savings appear after "sagecut numbers" runs on a video that Clef swept.'); return 0; }
   say(sess ? sessionLine(totals(rows, sess.startedAt)) : sessionLine(totals(rows, null), 'SageCut, all videos'));
   return 0;
 }

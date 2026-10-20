@@ -64,3 +64,23 @@ test('designedBy: the brand allows an effect, the schedule says where; undeclare
   assert.equal(designedBy({ check: 'edge_margin', frames: [40] }, all, w), null);
   assert.equal(designedBy({ check: 'frozen_frames', frames: [40, 41] }, all, w), null);
 });
+
+test('scale levels reach Clef whole: each level is only { level, description } (an unquoted comma used to cut a description short)', () => {
+  for (const q of Object.values(bank.questions).filter((x) => x.kind === 'scale')) {
+    for (const l of q.levels) assert.deepEqual(Object.keys(l).sort(), ['description', 'level'], `${q.id} level ${l.level}: ${JSON.stringify(l)}`);
+  }
+  assert.equal(bank.questions.hierarchy.levels[2].description, 'Readable order, but two tiers look nearly the same size or weight');
+});
+
+test('renderQuestion: element text with {braces} is filled in, not mistaken for an unfilled placeholder', () => {
+  const q = { id: 'staging_order', kind: 'yesno', instructions: 'Expected order: {expected_order}. In order?' };
+  assert.match(renderQuestion(q, { expected_order: 'const {data} = useQuery(), then Done' }).instructions, /const \{data\} = useQuery\(\)/);
+  assert.throws(() => renderQuestion(q, {}), /unfilled placeholder/);
+});
+
+test('expectedOrder: a numeric beat.order (a sort key, per the docs) falls back to the element entry order', async () => {
+  const { expectedOrder } = await import('../../src/gate/pipeline.mjs');
+  const beat = { order: 2, elements: [{ id: 'b', in: 9, text: 'Second' }, { id: 'a', in: 1, text: 'First' }] };
+  assert.equal(expectedOrder(beat), 'First, then Second');
+  assert.equal(expectedOrder({ ...beat, order: ['b', 'a'] }), 'Second, then First');
+});

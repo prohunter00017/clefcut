@@ -4,13 +4,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { userDataDir, pluginRoot, sagecutDir } from '../core/paths.mjs';
-import { loadSageEnv, KEY_PAGE } from '../core/env.mjs';
+import { loadClefEnv, KEY_PAGE } from '../core/env.mjs';
 import { readJson, writeJson, say } from '../core/log.mjs';
 
 export const help = 'onboarding state: status | welcome | done';
 
 const stateFile = () => path.join(userDataDir(), 'state.json');
-const FALLBACK = 'Welcome to SageCut, a way to produce Remotion videos faster and cheaper, with every frame checked by the Sage decision model.';
+const FALLBACK = 'Welcome to SageCut, a way to produce Remotion videos faster and cheaper, with every frame checked by the Clef decision model on Cloudflare Workers AI.';
 
 function isRemotionProject(root) {
   try {
@@ -24,7 +24,7 @@ export function status(root, config) {
   const state = readJson(stateFile(), {});
   return {
     onboarded: Boolean(state.onboarded),
-    hasKey: loadSageEnv(root).hasKey,
+    hasKey: loadClefEnv(root).hasKey,
     hasBrand: fs.existsSync(config ? config.brandPath : path.join(sagecutDir(root), 'brand.yaml')),
     hasSchedule: fs.existsSync(config ? config.schedulePath : path.join(sagecutDir(root), 'schedule.json')),
     isRemotionProject: isRemotionProject(root),

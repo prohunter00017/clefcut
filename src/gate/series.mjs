@@ -75,7 +75,9 @@ export async function scanVideo(video, { root, skip = [] }) {
 
 export function basics(g) {
   const n = g.length, P = g[0].length;
-  const paper = Math.trunc(medianU8(g[0]));
+  // the paper colour: the median over frames across the film, not frame 0 (a fade from black would make black the paper)
+  const ms = []; for (let f = 0; f < n; f += Math.max(1, Math.floor(n / 60))) ms.push(medianU8(g[f]));
+  const paper = Math.trunc(median(ms));
   const ink = new Float64Array(n), diff = new Float64Array(n), L = new Float64Array(n);
   for (let f = 0; f < n; f++) {
     const a = g[f];
@@ -156,6 +158,7 @@ export function measureBeats(g, B, sched, fps, excused, designed) {
   });
 
   const settled = sched.beats.map((b) => {
+    if (n < 5) return { beat: b.id, frame: Math.max(0, Math.min(n - 1, Math.round((b.start + b.end) / 2))), score: null, settled: false };
     let [h0, h1] = b.hold || [b.start, b.end];
     h0 = Math.max(2, h0); h1 = Math.min(n - 3, h1);
     if (h1 < h0) { h0 = Math.max(2, Math.min(b.start, n - 3)); h1 = n - 3; }
@@ -354,8 +357,9 @@ export function findCellPops(g, excusedCell, designed, regions, FW, FH) {
   const cad = new Set();
   let i = 0;
   while (i < frames.length) {
+    const g0 = i + 1 < frames.length ? frames[i + 1] - frames[i] : Infinity;
     let j = i + 1;
-    while (j < frames.length && Math.abs((frames[j] - frames[j - 1]) - (i + 1 < frames.length ? frames[i + 1] - frames[i] : 0)) <= 1) j++;
+    if (g0 <= C.CADENCE_MAX_GAP) while (j < frames.length && Math.abs((frames[j] - frames[j - 1]) - g0) <= 1) j++;
     if (j - i >= C.CADENCE_MIN) { for (let q = i; q < j; q++) cad.add(frames[q]); i = j; } else i++;
   }
   const out = [], cadence = [];

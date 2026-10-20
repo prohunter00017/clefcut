@@ -187,3 +187,9 @@ export function textChecks(beat, lines, frame, W, H, masks, png) {
   }
   return out;
 }
+
+// OCR lines whose centre lies inside an image region ([x0, y0, x1, y1]): photos and footage, not type.
+export function dropLinesIn(lines, rects) {
+  if (!rects || !rects.length) return lines;
+  return lines.filter((l) => { const cx = l.x + l.w / 2, cy = l.y + l.h / 2; return !rects.some(([x0, y0, x1, y1]) => cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1); });
+}

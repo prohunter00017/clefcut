@@ -47,6 +47,9 @@ export function listSessionFiles(configDir = claudeConfigDir()) {
   return out.sort((a, b) => b.mtime - a.mtime);
 }
 
+// The marker as a whole token: "X-101500" does not match "X-101500-2".
+const markerIn = (text, marker) => new RegExp(`${marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`).test(text);
+
 export function findMarkedFiles(marker, { configDir = claudeConfigDir(), sinceMs = 0 } = {}) {
   const hits = [];
   for (const f of listSessionFiles(configDir)) {
@@ -56,7 +59,7 @@ export function findMarkedFiles(marker, { configDir = claudeConfigDir(), sinceMs
     try { head = readHead(f.file); } catch { continue; }
     const nl = head.indexOf('\n');
     const first = nl >= 0 ? head.slice(0, nl) : head;
-    if (first.includes(marker)) hits.push(f.file);
+    if (markerIn(first, marker)) hits.push(f.file);
   }
   return hits;
 }
@@ -73,6 +76,7 @@ export async function parseSessionFile(file) {
     if (!line) continue;
     let o;
     try { o = JSON.parse(line); } catch { continue; }
+    if (!o || typeof o !== 'object') continue;
     if (o.timestamp) {
       const t = Date.parse(o.timestamp);
       if (Number.isFinite(t)) { if (first === null || t < first) first = t; if (last === null || t > last) last = t; }

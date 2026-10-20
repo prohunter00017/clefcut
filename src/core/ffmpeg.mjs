@@ -86,8 +86,11 @@ export async function probe(video, { root = process.cwd() } = {}) {
   const fps = den ? num / den : num;
   const duration = Number(v.duration || (j.format && j.format.duration) || 0);
   const frames = v.nb_frames ? Number(v.nb_frames) : Math.round(duration * fps);
+  // ffmpeg decodes with the display rotation applied, so a 90/270 degree video is height x width in every frame we read
+  const rotation = Number(((v.side_data_list || []).find((d) => d.rotation !== undefined) || {}).rotation ?? (v.tags && v.tags.rotate) ?? 0) || 0;
+  const turned = Math.abs(rotation) % 180 === 90;
   return {
-    width: v.width, height: v.height, fps, frames, duration, codec: v.codec_name, pixFmt: v.pix_fmt,
+    width: turned ? v.height : v.width, height: turned ? v.width : v.height, rotation, fps, frames, duration, codec: v.codec_name, pixFmt: v.pix_fmt,
     colorRange: v.color_range || 'unknown', sar: v.sample_aspect_ratio || null,
     hasAudio: (j.streams || []).some((s) => s.codec_type === 'audio'), formatName: j.format && j.format.format_name,
   };
@@ -102,7 +105,8 @@ export async function* frames(video, { root = process.cwd(), width, height, gray
   const t = locate(root);
   const p = spawn(t.ffmpeg, ['-v', 'error', '-i', video, '-vf', vf.join(','), '-f', 'image2pipe', '-c:v', 'rawvideo', '-pix_fmt', pix, 'pipe:1'],
     { env: t.env, windowsHide: true });
-  let err = '';
+  let err = '', failed = null;
+  p.on('error', (e) => { failed = e; });                  // a missing ffmpeg: a clear error, not an uncaught crash
   p.stderr.on('data', (d) => { err += d.toString(); });
   let buf = Buffer.alloc(0); let index = start;
   try {
@@ -116,7 +120,8 @@ export async function* frames(video, { root = process.cwd(), width, height, gray
   } finally {
     if (p.exitCode === null) p.kill();
   }
-  const code = await new Promise((r) => (p.exitCode !== null ? r(p.exitCode) : p.on('close', r)));
+  const code = await new Promise((r) => (failed || p.exitCode !== null ? r(p.exitCode) : (p.once('close', r), p.once('error', () => r(null)))));
+  if (failed) throw new Error(`ffmpeg could not start (${t.ffmpeg}): ${failed.message}. Run "sagecut doctor".`);
   if (code !== 0 && code !== null && index === start) throw new Error(`ffmpeg decode failed: ${err.trim().slice(0, 300)}`);
 }
 
@@ -142,8 +147,10 @@ export const toDataUri = (buf, format = 'png') => `data:image/${format === 'jpg'
 
 export async function loudness(video, { root = process.cwd() } = {}) {
   const r = await run('ffmpeg', ['-hide_banner', '-nostats', '-i', video, '-vn', '-af', 'loudnorm=print_format=json', '-f', 'null', '-'], { root });
-  const m = r.stderr.match(/\{[\s\S]*"input_i"[\s\S]*?\}/);
+  const m = r.stderr.match(/\{\s*"input_i"[\s\S]*?\}/);          // the loudnorm block, not a "{" in the file name
   if (!m) return null;
-  const j = JSON.parse(m[0]);
-  return { lufs: Number(j.input_i), truePeak: Number(j.input_tp), lra: Number(j.input_lra) };
+  let j;
+  try { j = JSON.parse(m[0]); } catch { return null; }
+  const val = (v) => { const x = Number(v); return Number.isFinite(x) ? x : null; };   // "-inf" for silence
+  return { lufs: val(j.input_i), truePeak: val(j.input_tp), lra: val(j.input_lra) };
 }

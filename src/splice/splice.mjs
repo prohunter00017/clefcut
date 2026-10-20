@@ -37,7 +37,12 @@ export async function planSplice(master, [a, b], { root }) {
   const next = keys.find((k) => k > b);
   const g1 = next === undefined ? total - 1 : next - 1;
   const info = await probe(master, { root });
-  return { total, keyframes: keys, g0, g1, frames: g1 - g0 + 1, fps: info.fps, requested: [a, b], index: idx, info };
+  const warnings = [];
+  const sei = readX264Options(master);
+  const bframes = Number(((sei.options || '').match(/\bbframes=(\d+)/) || [])[1] || 0);
+  if (bframes > 0) warnings.push(`The master uses ${bframes} B-frames. A splice into it usually fails the packet-timing proof; render the full video instead, or deliver masters encoded without B-frames.`);
+  if (!sei.options) warnings.push('The master has no x264 encoder text; splice works only on masters that x264 wrote (Remotion --codec h264).');
+  return { total, keyframes: keys, g0, g1, frames: g1 - g0 + 1, fps: info.fps, requested: [a, b], index: idx, info, warnings };
 }
 
 // "x264 - core 164 ... options: cabac=1 ref=3 ..." from the encoder SEI of the master.

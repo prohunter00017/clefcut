@@ -2,14 +2,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { SageClient } from '../core/sage.mjs';
+import { ClefClient } from '../core/clef.mjs';
 import { writeJson, say, setQuiet } from '../core/log.mjs';
 import { runControlled } from '../sweep/controlled.mjs';
 import { makeControl, defaultControl, CONTROL_KINDS } from '../sweep/synth.mjs';
 import { expandGlob, decodeImageFile, pngUri } from '../sweep/images.mjs';
 import { loadContext, num } from '../sweep/common.mjs';
 
-export const help = 'Ask Sage one yes/no question about some images, with an automatic control.';
+export const help = 'Ask Clef one yes/no question about some images, with an automatic control.';
 
 export async function run(argv, { root, config }) {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
@@ -18,8 +18,8 @@ export async function run(argv, { root, config }) {
   if (values.help || !(values.images || positionals.length) || !values.question) {
     console.log('usage: sagecut ask --images <glob> --question "<text>" [--width N] [--control cut|black|frozen|ghost|offbrand|none]\n' +
       '                   [--control-expect yes|no] [--out FILE] [--json]\n\n' +
-      'Asks Sage one yes/no question on each image (scaled to --width, default the test width). A control made from your first\n' +
-      'image runs in the same batch. If Sage misses the defect in the control, the run is unreliable: its "no" answers prove nothing.\n' +
+      'Asks Clef one yes/no question on each image (scaled to --width, default the test width). A control made from your first\n' +
+      'image is asked with them. If Clef misses the defect in the control, the run is unreliable: its "no" answers prove nothing.\n' +
       'Without --control, the control is chosen from the question words; --control none turns it off.');
     return values.help ? 0 : 2;
   }
@@ -39,8 +39,8 @@ export async function run(argv, { root, config }) {
     files.push(...hit);
   }
   const unique = [...new Set(files)];
-  const client = new SageClient({ root, workers: config.workers || 4, plan: config.plan, tag: 'ask' });
-  client.headers();
+  const client = new ClefClient({ root, workers: config.workers || 4, tag: 'ask' });
+  client.check();
 
   const frames = [];
   for (const f of unique) frames.push(await decodeImageFile(f, { root, width }));
@@ -57,10 +57,14 @@ export async function run(argv, { root, config }) {
   const c = res.controls.q;
   const verified = !!control;
   const unreliable = verified ? !c.ok : false;
+  // an auto-picked control assumes "yes" means the defect; a question where "no" is the defect needs --control-expect no
+  const polarityHint = control && !values.control && !values['control-expect'] && !c.ok && c.pos && c.pos.answer === 'no'
+    ? `the control was picked from the question words and expects "yes" for the defect; if "no" means the defect in your question, run again with --control-expect no` : null;
   const rows = res.rows.map((r) => ({ id: r.id, label: r.label, answer: r.answers.q.answer, p: r.answers.q.p, null: r.answers.q.answer == null, error: r.answers.q.error || null }));
+  const errors = rows.filter((r) => r.error).length + (control && c.pos && c.pos.error ? 1 : 0);
   const out = {
     question: values.question, width, control: control ? { kind: control.kind, expect, ok: c.ok, reason: c.reason, answer: c.pos && c.pos.answer, p: c.pos && c.pos.p } : { kind: 'none', note: controlNote },
-    unreliable, count: rows.length, usage: res.usage, usd: Number(res.usd.toFixed(6)), seconds: Number(res.seconds.toFixed(1)), results: rows,
+    unreliable, ...(polarityHint ? { hint: polarityHint } : {}), count: rows.length, errors, usage: res.usage, usd: Number(res.usd.toFixed(6)), seconds: Number(res.seconds.toFixed(1)), results: rows,
   };
   if (values.out) writeJson(path.resolve(values.out), out);
   if (values.json) console.log(JSON.stringify(out));
@@ -68,9 +72,11 @@ export async function run(argv, { root, config }) {
     const w = Math.max(...rows.map((r) => r.label.length), 5);
     for (const r of rows) say(`${r.label.padEnd(w)}  ${(r.answer || 'null').padEnd(4)}  p=${r.p != null ? r.p.toFixed(3) : '-'}${r.error ? `  error: ${r.error}` : ''}`);
     say('');
-    if (control) say(`control (${control.kind}, expected ${expect}): ${c.ok ? 'OK' : 'FAILED'}, ${c.reason}${unreliable ? '\nUNRELIABLE: Sage missed the defect in the control, so its "no" answers above prove nothing. Measure instead.' : ''}`);
+    if (control) say(`control (${control.kind}, expected ${expect}): ${c.ok ? 'OK' : 'FAILED'}, ${c.reason}${unreliable ? '\nUNRELIABLE: Clef missed the defect in the control, so its "no" answers above prove nothing. Measure instead.' : ''}`);
     else say(`control: none${controlNote ? ` (${controlNote})` : ''}`);
+    if (polarityHint) say(`hint: ${polarityHint}`);
+    if (errors) say(`ERROR: ${errors} of ${rows.length + (control ? 1 : 0)} pictures got no answer from Clef; their answers are missing, not "no".`);
     say(`${rows.length} images, billed input ${res.usage.billed_input_tokens}, output ${res.usage.output_tokens}, cost $${res.usd.toFixed(6)}`);
   }
-  return unreliable ? 1 : 0;
+  return errors ? 2 : unreliable ? 1 : 0;
 }

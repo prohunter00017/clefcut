@@ -3,7 +3,7 @@ export const fmtUsd = (x) => (x === null || x === undefined ? 'not measured' : `
 
 export function fmtSeconds(s) {
   if (s === null || s === undefined) return 'not measured';
-  if (s < 120) return `${Math.round(s)} s`;
-  const m = Math.floor(s / 60);
-  return `${m} min ${Math.round(s - m * 60)} s`;
+  const r = Math.round(s);                                // round once, so 119.7 is "2 min 0 s", never "120 s" or "1 min 60 s"
+  if (r < 120) return `${r} s`;
+  return `${Math.floor(r / 60)} min ${r % 60} s`;
 }

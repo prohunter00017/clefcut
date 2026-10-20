@@ -24,3 +24,10 @@ test('the total is capped at MAX_CRITIC_FRAMES, and the cap is 32', () => {
   const picks = selectCriticFrames({ sched: { beats, transitions: [] }, settled: [], rows: [], beatOf: () => 'x', total: 1000, motion: topMotionFrames(new Float64Array(1000).map((_, f) => f % 7)) });
   assert.ok(picks.length <= MAX_CRITIC_FRAMES);
 });
+
+test('frameOfRow: a single-frame row is that frame, not frame 0', async () => {
+  const { frameOfRow } = await import('../../src/gate/critic.mjs');
+  assert.equal(frameOfRow({ frames: [29] }), 29);
+  assert.equal(frameOfRow({ frames: [40, 41] }), 41);
+  assert.equal(frameOfRow({ frames: [10, 20] }), 15);
+});

@@ -70,17 +70,27 @@ export function makeExplainer(schedule, { tolerance = 15, frames = null, designe
       }
     }
   }
-  const trans = schedule ? schedule.transitions.map((t) => t.frames) : [];
+  const trans = schedule ? (schedule.transitions || []).map((t) => t.frames) : [];
+  // designed flashes and glitches: only inside declared effect frames, and only when the brand allows the kind (as in the gate)
+  const effects = schedule ? (schedule.effects || []).filter((e) => e && designed.has(e.kind) && Array.isArray(e.frames)).map((e) => e.frames) : [];
   const cuts = schedule ? [...schedule.cuts, ...(schedule.interim_cuts || []).map((c) => (typeof c === 'number' ? c : c.frame)).filter((x) => x != null)] : [];
   return function why(f, q) {
     if (q === 'legible' && schedule && !onscreen.has(f)) return 'no type on screen';
     if (moving.has(f) || edges.some((x) => Math.abs(f - x) <= tolerance)) return 'element enter/exit';
-    if (trans.some(([a, b]) => f >= a && f <= b)) return 'transition';
+    if (trans.some(([a, b]) => f >= a - tolerance && f <= b + tolerance)) return 'transition';
     if (cuts.some((c) => Math.abs(f - c) <= 2)) return 'cut';
     if (frames != null && (f <= 1 || f >= frames - 2)) return 'frame edge (first or last frames)';
-    if (q === 'glitch' && designed.has('glitch')) return 'designed effect (brand)';
+    if (q === 'glitch' && effects.some(([a, b]) => f >= a && f <= b)) return 'designed effect (schedule effects)';
     return null;
   };
+}
+
+// A frame is read only when every answer for it came back; any error, or no answer at all, makes it failed.
+export function frameStatus(rows, frames) {
+  const bad = new Set(), seen = new Set();
+  for (const r of rows) { seen.add(r.f); if (r.error) bad.add(r.f); }
+  const read = new Set(frames.filter((f) => seen.has(f) && !bad.has(f)));
+  return { read, failed: frames.filter((f) => !read.has(f)).sort((a, b) => a - b) };
 }
 
 // Split flagged frames into explained counts and residual runs.

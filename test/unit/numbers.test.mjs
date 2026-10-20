@@ -5,16 +5,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { expandRuns, computeNumbers, renderCard, fmtUsd, fmtSeconds, openedImages, ESTIMATE_METHOD, HOUSE_METHOD } from '../../src/commands/numbers.mjs';
 import { HOUSE_REVIEW } from '../../src/core/costs.mjs';
-import { sageUsd } from '../../src/core/sage.mjs';
+import { clefUsd } from '../../src/core/clef.mjs';
 
 const sweep = { video_sha256_12: 'aaaaaaaaaaaa', frames_read: 600, usd: 0.011186, seconds: 187 };
-const triage = { usd: 0.000072, seconds: 12, residual_runs: 2, counts: { 'cleared-by-sage': 1, confirmed: 1, 'to-measure': 0, 'cleared-by-measurement': 0 } };
+const triage = { usd: 0.000072, seconds: 12, residual_runs: 2, counts: { 'cleared-by-clef': 1, confirmed: 1, 'to-measure': 0, 'cleared-by-measurement': 0 } };
 const baseline = { id: 'abcd1234', video_sha256_12: 'aaaaaaaaaaaa', frames_reviewed: 10, usd_per_frame: 0.2, seconds_per_frame: 12.5 };
 
 test('computeNumbers: measured part sums the runs; estimate is per-frame baseline x frames read', () => {
-  const n = computeNumbers({ sweeps: [sweep], triages: [triage], opened: ['a', 'b', 'a'], baseline, plan: 'developer' });
+  const n = computeNumbers({ sweeps: [sweep], triages: [triage], opened: ['a', 'b', 'a'], baseline, model: 'clef' });
   assert.equal(n.sagecut.frames_read, 600);
-  assert.equal(n.sagecut.sage_usd, 0.011258);
+  assert.equal(n.sagecut.clef_usd, 0.011258);
   assert.equal(n.sagecut.qa_seconds, 199);
   assert.equal(n.sagecut.frames_opened_by_claude, 2);        // distinct
   assert.equal(n.sagecut.critics_usd, null);
@@ -30,7 +30,7 @@ test('the method line is exact', () => {
 });
 
 test('no baseline: the old review is estimated at the reference build rate, and says so', () => {
-  const n = computeNumbers({ sweeps: [sweep], plan: 'developer' });
+  const n = computeNumbers({ sweeps: [sweep], model: 'clef' });
   const e = n.old_review_estimate;
   assert.equal(e.reference, 'house');
   assert.equal(e.estimate, true);
@@ -54,16 +54,16 @@ test('no sweep: no comparison', () => {
   assert.match(n.baseline_note, /no sweep/);
 });
 
-test('Sage cost: image tokens are charged at the input rate (OpenAPI 1.4.0)', () => {
-  // one 960x540 frame with 4 questions, as Sage reports it: 434 text + 511 image tokens
-  assert.equal(sageUsd({ billed_input_tokens: 434, image_tokens: 511, output_tokens: 0 }, 'developer'), 945 * 0.05 / 1e6);
-  assert.equal(sageUsd({ billed_input_tokens: 434, output_tokens: 0 }, 'developer'), 434 * 0.05 / 1e6);
+test('Clef cost: image tokens are charged at the input rate', () => {
+  // one 960x540 frame with 4 questions: 434 text + 513 image tokens
+  assert.equal(clefUsd({ billed_input_tokens: 434, image_tokens: 513, output_tokens: 1 }, 'clef'), 947 * 0.24 / 1e6);
+  assert.equal(clefUsd({ billed_input_tokens: 434, output_tokens: 0 }, 'clef'), 434 * 0.24 / 1e6);
 });
 
 test('a run file with usage is priced from its tokens, not from a stored text-only usd', () => {
-  const old = { ...sweep, usd: 0.0001, usage: { billed_input_tokens: 1000, image_tokens: 2000, output_tokens: 0 }, plan: 'developer' };
+  const old = { ...sweep, usd: 0.0001, usage: { billed_input_tokens: 1000, image_tokens: 2000, output_tokens: 0 }, model: 'clef' };
   const n = computeNumbers({ sweeps: [old] });
-  assert.equal(n.sagecut.sage_usd, Number((3000 * 0.05 / 1e6).toFixed(6)));
+  assert.equal(n.sagecut.clef_usd, Number((3000 * 0.24 / 1e6).toFixed(6)));
 });
 
 test('a baseline with no list price gives no comparison', () => {
@@ -81,9 +81,9 @@ test('runs from two different videos are refused; a baseline of another video gi
   assert.equal(m.problems.length, 1);
 });
 
-test('gate findings: Sage cost from billed tokens at the plan rate', () => {
-  const n = computeNumbers({ sweeps: [sweep], gates: [{ billed_input_tokens: 1_000_000, output_tokens: 0, seconds: 5, video_sha256_12: 'aaaaaaaaaaaa' }], plan: 'growth' });
-  assert.equal(n.sagecut.sage_usd_parts.gate, 0.038);
+test('gate findings: Clef cost from billed tokens at the model rate', () => {
+  const n = computeNumbers({ sweeps: [sweep], gates: [{ billed_input_tokens: 1_000_000, output_tokens: 0, seconds: 5, video_sha256_12: 'aaaaaaaaaaaa' }], model: 'clef-flash' });
+  assert.equal(n.sagecut.clef_usd_parts.gate, 0.038);
   assert.equal(n.sagecut.qa_seconds, 192);
 });
 
@@ -99,9 +99,9 @@ test('critics from the session files: USD, tokens, image views and distinct imag
 test('card: every number is in the data; estimates are marked; method line present', () => {
   const n = computeNumbers({ sweeps: [sweep], triages: [triage], baseline });
   const card = renderCard(n, ['sweep.json']);
-  assert.match(card, /Frames Sage read: 600/);
+  assert.match(card, /Frames Clef read: 600/);
   assert.match(card, /QA time: 3 min 19 s/);
-  assert.match(card, /Sage cost: \$0\.0113 \(developer plan rate\)/);
+  assert.match(card, /Clef cost: \$0\.0113 \(clef model rate\)/);
   assert.match(card, /Time: 125 min 0 s \(estimate\)/);
   assert.match(card, /Cost: \$120\.00 \(estimate\)/);
   assert.ok(card.includes('estimate from 10 measured frames, Claude API list prices'));
@@ -138,17 +138,17 @@ test('openedImages: new shape counts distinct frame values', () => {
 });
 
 test('with no opened.json the card says "not recorded", not 0', () => {
-  const none = computeNumbers({ sweeps: [sweep], triages: [triage], opened: [], openedRecorded: false, baseline, plan: 'developer' });
+  const none = computeNumbers({ sweeps: [sweep], triages: [triage], opened: [], openedRecorded: false, baseline, model: 'clef' });
   assert.equal(none.sagecut.frames_opened_by_claude, null);
   assert.match(renderCard(none, []), /Frames recorded as opened by Claude: not recorded \(no opened\.json in the run\)/);
-  const some = computeNumbers({ sweeps: [sweep], triages: [triage], opened: ['a', 'b'], openedRecorded: true, baseline, plan: 'developer' });
+  const some = computeNumbers({ sweeps: [sweep], triages: [triage], opened: ['a', 'b'], openedRecorded: true, baseline, model: 'clef' });
   assert.equal(some.sagecut.frames_opened_by_claude, 2);
   assert.match(renderCard(some, []), /Frames recorded as opened by Claude \(from opened\.json\): 2/);
 });
 
 test('the card lists the time for each step, and the critics time is in the savings', () => {
   const crit = { usd: 0.36, tokens: {}, agents: 3, image_views: 22, distinct_images: 11, price_unknown: [], seconds: 300 };
-  const n = computeNumbers({ sweeps: [sweep], triages: [triage], opened: ['a'], openedRecorded: true, critics: crit, baseline, plan: 'developer' });
+  const n = computeNumbers({ sweeps: [sweep], triages: [triage], opened: ['a'], openedRecorded: true, critics: crit, baseline, model: 'clef' });
   assert.equal(n.time_by_step.critics_seconds, 300);
   assert.equal(n.time_by_step.render_seconds, null);
   assert.equal(n.sagecut.qa_seconds, 199);
@@ -157,4 +157,59 @@ test('the card lists the time for each step, and the critics time is in the savi
   assert.match(card, /- Render: not measured by SageCut/);
   assert.match(card, /- Critics: 5 min 0 s/);
   assert.match(card, /- Baseline: not measured/);
+});
+
+test('numbers: a gate run is priced at the Clef model it records, not at the default model', async () => {
+  const { run } = await import('../../src/commands/numbers.mjs');
+  const { loadConfig } = await import('../../src/core/config.mjs');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-numbers-clef-')), dir = path.join(root, 'sagecut', 'qa', 'gate-1');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'findings.json'), JSON.stringify({ video: path.join(root, 'v.mp4'), video_sha256_12: 'aaaaaaaaaaaa', seconds: 5, clef_asked: 1, clef_errors: [],
+    clef: { ran: true, calls: 1, billed_input_tokens: 1_000_000, image_tokens: 0, output_tokens: 0, usd: 0.038, model: 'clef-flash' } }));
+  const home = process.env.SAGECUT_HOME; process.env.SAGECUT_HOME = path.join(root, 'home');
+  const out = []; const log = console.log; console.log = (s) => out.push(String(s));
+  try { await run(['--runs', dir, '--json'], { root, config: loadConfig(root) }); }
+  finally { console.log = log; if (home === undefined) delete process.env.SAGECUT_HOME; else process.env.SAGECUT_HOME = home; }
+  const n = JSON.parse(out.find((s) => s.startsWith('{')));
+  assert.equal(n.sagecut.clef_usd_parts.gate, 0.038);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('frames read: the union of the sweeps, not the largest one', () => {
+  const a = { video_sha256_12: 'aaaaaaaaaaaa', range: [0, 599], step: 1, frames_read: 560, failed_frames: Array.from({ length: 40 }, (_, i) => 10 + i), usd: 0, seconds: 1 };
+  const b = { video_sha256_12: 'aaaaaaaaaaaa', range: [10, 49], step: 1, frames_read: 40, failed_frames: [], usd: 0, seconds: 1 };
+  assert.equal(computeNumbers({ sweeps: [a, b] }).sagecut.frames_read, 600);           // the re-run that sweep's warning asks for
+  const h1 = { ...b, range: [0, 299], frames_read: 300 }, h2 = { ...b, range: [300, 599], frames_read: 300 };
+  assert.equal(computeNumbers({ sweeps: [h1, h2] }).sagecut.frames_read, 600);
+  assert.equal(computeNumbers({ sweeps: [{ ...b, range: [0, 598], step: 2, frames_read: 300 }] }).sagecut.frames_read, 300);
+  assert.equal(computeNumbers({ sweeps: [sweep] }).sagecut.frames_read, 600);           // a run file without a range keeps its count
+});
+
+test('numbers: the same run folder twice counts once, and the ledger row names the swept video', async () => {
+  const { run } = await import('../../src/commands/numbers.mjs');
+  const { loadConfig } = await import('../../src/core/config.mjs');
+  const { readRows } = await import('../../src/core/savings.mjs');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-numbers-dup-')), dir = path.join(root, 'qa-run');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'sweep.json'), JSON.stringify({ video: path.join(root, 'film.mp4'), video_sha256_12: 'bbbbbbbbbbbb', range: [0, 99], step: 1,
+    frames_read: 100, failed_frames: [], usage: { billed_input_tokens: 1000, image_tokens: 0, output_tokens: 0 }, model: 'clef', usd: 0.00024, seconds: 10, rows: [] }));
+  const home = process.env.SAGECUT_HOME; process.env.SAGECUT_HOME = path.join(root, 'home');
+  const out = []; const log = console.log; console.log = (s) => out.push(String(s));
+  try { await run(['--runs', dir, '--runs', dir, '--json'], { root, config: loadConfig(root) }); }
+  finally { console.log = log; }
+  try {
+    const n = JSON.parse(out.find((s) => s.startsWith('{')));
+    assert.equal(n.sagecut.clef_usd, 0.00024);
+    assert.equal(n.sagecut.qa_seconds, 10);
+    assert.equal(readRows(path.join(root, 'home', 'savings.jsonl'))[0].video, 'film.mp4');
+  } finally {
+    if (home === undefined) delete process.env.SAGECUT_HOME; else process.env.SAGECUT_HOME = home;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('fmtSeconds never prints 60 s or 120 s', () => {
+  assert.equal(fmtSeconds(179.6), '3 min 0 s');
+  assert.equal(fmtSeconds(119.7), '2 min 0 s');
+  assert.equal(fmtSeconds(119.4), '119 s');
 });

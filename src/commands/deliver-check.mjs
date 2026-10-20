@@ -80,9 +80,10 @@ export async function checkVideo(video, ctx, { frameSet = null, ocr = true } = {
     add('audio stream', 'pass', 'present');
     const l = await loudness(video, { root });
     if (!l) add('loudness', 'skip', 'could not measure');
+    else if (l.lufs == null) add('loudness', 'fail', 'the audio track is silent: no loudness to measure (target -14 LUFS)');
     else {
       add('loudness', Math.abs(l.lufs + 14) <= 1 ? 'pass' : 'fail', `${l.lufs.toFixed(1)} LUFS (target -14 +/- 1)`);
-      add('true peak', l.truePeak <= -1 ? 'pass' : 'fail', `${l.truePeak.toFixed(1)} dBTP (limit -1)`);
+      if (l.truePeak != null) add('true peak', l.truePeak <= -1 ? 'pass' : 'fail', `${l.truePeak.toFixed(1)} dBTP (limit -1)`);
     }
     const sil = await silenceRuns(video, root);
     if (sil.length) add('digital silence', 'fail', `${sil.length} run(s) of true zero audio of 0.5 s or more: ${sil.slice(0, 5).map((s) => `${s.start.toFixed(2)} s${s.duration ? ` for ${s.duration.toFixed(2)} s` : ' to the end'}`).join(', ')}. Use room tone.`);
@@ -153,6 +154,13 @@ export async function fixVideo(video, checks, out, { root }) {
   return { mode: range ? 're-encode (limited range, crf 17, faststart)' : 'remux (faststart)', out };
 }
 
+// After --fix the re-check runs fewer checks (no OCR): a first-pass failure it did not run again still counts.
+export function finalFailures(checks, recheck) {
+  if (!recheck) return checks.filter((c) => c.status === 'fail');
+  const rerun = new Map(recheck.filter((c) => c.status !== 'skip').map((c) => [c.name, c]));
+  return [...recheck.filter((c) => c.status === 'fail'), ...checks.filter((c) => c.status === 'fail' && !rerun.has(c.name))];
+}
+
 export async function run(argv, ctx) {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
     fix: { type: 'boolean' }, out: { type: 'string' }, json: { type: 'boolean' }, root: { type: 'string' }, help: { type: 'boolean' } } });
@@ -168,7 +176,7 @@ export async function run(argv, ctx) {
     fixed = await fixVideo(video, checks, out, { root: ctx.root });
     if (fixed) recheck = (await checkVideo(out, ctx, { ocr: false })).checks;
   }
-  const failing = (recheck || checks).filter((c) => c.status === 'fail');
+  const failing = finalFailures(checks, recheck);
   const report = { video, runDir, ok: failing.length === 0, checks, ...(fixed ? { fixed, recheck } : {}) };
   fs.writeFileSync(path.join(runDir, 'report.json'), JSON.stringify(report, null, 1) + '\n');
   if (values.json) { say(JSON.stringify(report, null, 1)); return failing.length ? 1 : 0; }

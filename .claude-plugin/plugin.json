@@ -2,10 +2,10 @@
   "name": "sagecut",
   "displayName": "SageCut",
   "version": "0.3.0",
-  "description": "House-standard QA for Remotion videos in your brand. Every frame is measured and read by the Sage decision model.",
+  "description": "House-standard QA for Remotion videos in your brand. Every frame is measured and read by the Clef decision model on Cloudflare Workers AI.",
   "author": { "name": "Levanto Labs", "url": "https://levanto.ai" },
   "homepage": "https://github.com/levantolabs/sagecut-release",
   "repository": "https://github.com/levantolabs/sagecut-release",
   "license": "MIT",
-  "keywords": ["remotion", "video", "qa", "brand", "sage"]
+  "keywords": ["remotion", "video", "qa", "brand", "clef", "cloudflare"]
 }

@@ -1,4 +1,5 @@
 // Small numeric helpers shared by the gate modules.
+import { holdRanges } from '../core/frozen.mjs';
 export function median(arr) {
   const n = arr.length;
   if (!n) return NaN;
@@ -37,6 +38,15 @@ export async function mapLimit(items, limit, fn) {
 // Frame windows: [[a, b], ...] from pairs or bare frame numbers.
 export function windows(v) {
   return (v || []).map((x) => (Array.isArray(x) ? [Math.trunc(x[0]), Math.trunc(x[1])] : [Math.trunc(x), Math.trunc(x)]));
+}
+// Every declared hold: static_holds in any documented form ([a, b], { frames: [a, b] }, { start, end }), plus beat holds.
+export function declaredHolds(sched) {
+  const out = holdRanges(sched);
+  for (const b of (sched && sched.beats) || []) {
+    if (Array.isArray(b.hold)) out.push([Number(b.hold[0]), Number(b.hold[1])]);
+    else if (b.hold !== undefined && b.hold !== null) out.push([Number(b.hold), Number(b.end)]);
+  }
+  return out.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
 }
 export const inWindows = (f, wins, pad = 0) => wins.some(([a, b]) => a - pad <= f && f <= b + pad);
 export const rectOf = (x) => ((x && x.rect) || x).map(Number);

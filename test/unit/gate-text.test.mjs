@@ -78,3 +78,10 @@ test('normaliseLines maps the OCR shape and scales a 0..100 confidence', () => {
   const [l] = normaliseLines([{ text: 'Hi', bbox: { x0: 10, y0: 20, x1: 60, y1: 50 }, confidence: 87 }]);
   assert.deepEqual(l, { text: 'Hi', x: 10, y: 20, w: 50, h: 30, conf: 0.87 });
 });
+
+test('dropLinesIn: OCR lines inside an image region are not text checks', async () => {
+  const { dropLinesIn } = await import('../../src/gate/text.mjs');
+  const lines = [{ text: 'Headline', x: 100, y: 100, w: 300, h: 60 }, { text: 'photo noise', x: 900, y: 500, w: 80, h: 20 }];
+  assert.deepEqual(dropLinesIn(lines, [[800, 400, 1200, 700]]).map((l) => l.text), ['Headline']);
+  assert.equal(dropLinesIn(lines, []).length, 2);
+});

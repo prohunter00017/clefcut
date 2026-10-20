@@ -2,14 +2,14 @@
 import fs from 'node:fs';
 import { parseArgs } from 'node:util';
 import { locate, run as ff } from '../core/ffmpeg.mjs';
-import { loadSageEnv, maskKey, KEY_PAGE } from '../core/env.mjs';
-import { SageClient } from '../core/sage.mjs';
+import { loadClefEnv, maskKey, KEY_PAGE } from '../core/env.mjs';
+import { ClefClient } from '../core/clef.mjs';
 import { createOcr } from '../core/ocr.mjs';
 import { loadBrand } from '../core/brand.mjs';
 import { validateSchedule } from '../core/schedule.mjs';
 import { VERSION } from '../core/version.mjs';
 
-export const help = 'check Node, ffmpeg, the Sage key and server, OCR, brand and schedule';
+export const help = 'check Node, ffmpeg, the Cloudflare key and the Clef model, OCR, brand and schedule';
 
 export async function checks(ctx) {
   const out = [];
@@ -33,24 +33,7 @@ export async function checks(ctx) {
     add('ffmpeg', 'fail', e.message.split('\n')[0], 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set SAGECUT_FFMPEG and SAGECUT_FFPROBE.');
   }
 
-  const env = loadSageEnv(root);
-  if (env.hasKey) add('sage key', 'pass', `SAGE_API_KEY present (${maskKey(env.key)})`);
-  else add('sage key', 'fail', 'SAGE_API_KEY not found', `Make a key at ${KEY_PAGE}, then put SAGE_API_KEY=... in your project's .env file.`);
-
-  const client = new SageClient({ root });
-  const rd = await client.ready();
-  if (rd.ok) add('sage server', 'pass', `${env.endpoint}/ready answered 200`);
-  else add('sage server', 'fail', `${env.endpoint}/ready ${rd.status ? 'answered ' + rd.status : 'did not answer'}`, 'Check your network and SAGE_ENDPOINT. If this persists, see sagecut/qa/reference/troubleshooting.md.');
-
-  if (env.hasKey && rd.ok) {
-    try {
-      await client.post('/usage/estimate', { requests: [{ content: 'SageCut doctor check', questions: [{ id: 'q', kind: 'yesno', instructions: 'Is this text a test?' }] }] }, 1);
-      add('sage key check', 'pass', 'the server accepted the key (POST /usage/estimate answered 200)');
-    } catch (e) {
-      if (/rejected the key/.test(e.message)) add('sage key check', 'fail', 'the server rejected the key', `the server rejected the key: check SAGE_API_KEY in .env, make a key at ${KEY_PAGE}`);
-      else add('sage key check', 'warn', `could not check the key: ${e.message.replace(env.key, '(key)').split('\n')[0].slice(0, 160)}`, 'Run "sagecut doctor" again; if it persists see sagecut/qa/reference/troubleshooting.md.');
-    }
-  }
+  await clefChecks(root, add);
 
   try { const o = await createOcr(); await o.close(); add('ocr', 'pass', 'tesseract.js ready (local language data)'); }
   catch (e) { add('ocr', 'fail', e.message.split('\n')[0], 'Reinstall the plugin: assets/eng.traineddata or bin/ocr/ is missing.'); }
@@ -68,6 +51,18 @@ export async function checks(ctx) {
     } catch (e) { add('schedule', 'fail', e.message, 'Fix the JSON in the schedule file.'); }
   } else add('schedule', 'warn', `no schedule at ${ctx.config.schedule}`, 'Run "sagecut init".');
   return out;
+}
+
+// The Cloudflare key, then one tiny question to the Clef model.
+async function clefChecks(root, add) {
+  const env = loadClefEnv(root), model = `@cf/cloudflare/${env.model}`;
+  const fix = `Make an API token with the Workers AI permission at ${KEY_PAGE}, then put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env or ~/.sagecut/.env.`;
+  if (env.hasKey) add('clef key', 'pass', `CLOUDFLARE_ACCOUNT_ID (${maskKey(env.account)}) and CLOUDFLARE_API_TOKEN (${maskKey(env.token)}) present, model ${env.model}`);
+  else { add('clef key', 'fail', 'CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN not found', fix); return; }
+  const rd = await new ClefClient({ root }).ready();
+  if (rd.ok) add('clef model', 'pass', `Workers AI ${model} answered a test question`);
+  else add('clef model', 'fail', `Workers AI ${model}: ${String(rd.error || `HTTP ${rd.status}`).split(env.token).join('(key)').split('\n')[0].slice(0, 160)}`,
+    rd.status === 401 || rd.status === 403 ? fix : 'Check your network, CLOUDFLARE_ACCOUNT_ID and CLEF_MODEL (clef, clef-flash or clef-omni). If this persists, see the troubleshooting reference of the skill (references/troubleshooting.md).');
 }
 
 export async function run(argv, ctx) {

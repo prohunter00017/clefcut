@@ -104,9 +104,9 @@ source:
 |---|---|
 | Colours outside the brand palette in text and interface areas | Measurement on every frame. |
 | A stretched logo | The shape of the rendered logo is compared with the source file. |
-| Copy rules | A text check on the schedule before the render. No Sage cost. |
+| Copy rules | A text check on the schedule before the render. No Clef cost. |
 | Effects that are part of the design | `motion.designed` and the frames in the schedule together. The QA skips a finding only inside declared frames. |
-| On brand or off brand | A Sage question with the style words of the brand. The control is a frame with colours outside the brand. |
+| On brand or off brand | A Clef question with the style words of the brand. The control is a frame with colours outside the brand. |
 | The critics | They use `brand.yaml` as their rubric, with the house rules. |
 
 ## Ways to make a brand

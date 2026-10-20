@@ -1,6 +1,6 @@
 # SageCut QA
 
-SageCut gives a Remotion video three things: the house rules (a quality floor), your brand in every frame, and a fast and cheap QA. Code measures every frame. Sage reads every frame. The critics look only at the frames that SageCut selects. Claude opens a frame only when Sage and a measurement do not agree.
+SageCut gives a Remotion video three things: the house rules (a quality floor), your brand in every frame, and a fast and cheap QA. Code measures every frame. Clef reads every frame. The critics look only at the frames that SageCut selects. Claude opens a frame only when Clef and a measurement do not agree.
 
 ## How to run the tool
 
@@ -14,7 +14,7 @@ SageCut gives a Remotion video three things: the house rules (a quality floor), 
 | `references/house-rules.md` | Floors, review method, build checklist. Read it before you build. |
 | `references/brand-format.md` | Each field of `brand.yaml`, with an example. |
 | `references/schedule-format.md` | Each field of `schedule.json`, with an example. |
-| `references/question-bank.md` | The kinds of Sage questions and their controls. |
+| `references/question-bank.md` | The kinds of Clef questions and their controls. |
 | `references/cost-claims.md` | How to write QA cost and time. |
 | `references/splice.md` | A small change to a delivered video. |
 | `references/troubleshooting.md` | Doctor failures, API errors, empty answers. |
@@ -68,14 +68,14 @@ The field list and a full example are in `references/brand-format.md`. Read it b
 
 Do these steps in order.
 
-1. **Doctor.** Run `sagecut doctor`. If the Sage key is missing, tell the user to put `SAGE_API_KEY` in `.env`. Never ask for the key in the chat. If the project or the brand file is missing, do "Before the first video".
+1. **Doctor.** Run `sagecut doctor`. If the Cloudflare key is missing, tell the user to put `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in `.env`. Never ask for the token in the chat. If the project or the brand file is missing, do "Before the first video".
 2. **Init and schedule.** Run `sagecut init`. Write the timing in `sagecut/schedule.json`. Set a `role` on each text element. Declare each designed cut, flash or glitch in the schedule. Set `"resolveJsonModule": true` in `tsconfig.json`, then import the schedule in the composition. If the video has no sound on purpose, set `audio: none` in `sagecut/sagecut.yaml`. Run `sagecut check-schedule`. Fix each error before you render.
 3. **Render.** Run `npx remotion render <id> out/<name>.mp4 --codec h264 --crf 17 --color-space bt709`.
 4. **Gate.** Run `sagecut gate out/<name>.mp4`. Note the run folder. It has `findings.json`, `summary.md`, `contact.png` and `critic-frames/`.
 5. **Findings.** For each finding, do these steps:
    1. Measure the frame (the finding gives the measurement).
-   2. Ask Sage with `sagecut ask`. A control runs in the same batch.
-   3. If Sage and the measurement agree, accept the result.
+   2. Ask Clef with `sagecut ask`. A control is asked next to the frames.
+   3. If Clef and the measurement agree, accept the result.
    4. If they do not agree, open the frame yourself. Record the open in `opened.json` (see "Opening a frame").
 6. **Critics.** Start the critics on the frames that `gate` selected (see "Critics"). Do not let them open other frames.
 7. **Fix.** Fix the defects. Render again. Run `gate` again. After 3 rounds, stop and report what is still open.
@@ -92,26 +92,26 @@ Do these steps in order.
 
 ## The 9 rules
 
-1. Sage and measurement do the visual QA. Claude opens a frame only when they do not agree. Claude records each open.
-2. Each Sage question runs with a control in the same batch. If the control fails, the "no" answers to that question are not reliable.
+1. Clef and measurement do the visual QA. Claude opens a frame only when they do not agree. Claude records each open.
+2. Each Clef question runs with a control. If the control fails, the "no" answers to that question are not reliable.
 3. Make the controls from the user's own frames. Move text across the edge, use a black frame, or repeat a frame. Add a ghost copy of the text, or use colours outside the brand.
-4. Do not trust one Sage answer from one run. A measurement decides each open item.
+4. Do not trust one Clef answer from one run. A measurement decides each open item.
 5. On-screen numbers come from `numbers.json`. Do not type them. Placeholders stay until the final QA. `deliver-check` stops if it finds a placeholder.
 6. Run the final QA on the exact file that you deliver. If a frame changes, measure again.
 7. For cost claims, use API list prices and measured usage. Read the cache rate from the session files. Do not guess it. Do not put numbers from two different videos together. Report image views and different images as two numbers. Do not claim a saving against a cost that nobody measured.
-8. Sage reads legibility at the test width. OCR reads at full resolution.
+8. Clef reads legibility at the test width. OCR reads at full resolution.
 9. For a small change to a delivered video, render only the changed frames. Put them into the video file with `splice`. Check the result with the proof file.
 
 ## Opening a frame
 
-Open a frame only when Sage and a measurement disagree. Examples: Sage says "no overlap" and the measurement shows a collision, or the reverse.
+Open a frame only when Clef and a measurement disagree. Examples: Clef says "no overlap" and the measurement shows a collision, or the reverse.
 
 1. Before you open the frame, add an entry to `opened.json` in the run folder. If the file does not exist, make it with an empty list.
-2. The entry has these fields: `frame`, `time_s`, `question`, `sage_answer`, `measurement`, `reason`.
+2. The entry has these fields: `frame`, `time_s`, `question`, `clef_answer`, `measurement`, `reason`.
 3. Open the frame. Then add `finding` (what you saw) to the entry.
 4. The number of entries is the "frames that Claude opened" in the report.
 
-Never open a frame for comfort. Never open a frame that Sage and the measurement agree on.
+Never open a frame for comfort. Never open a frame that Clef and the measurement agree on.
 
 ## Critics
 
@@ -139,7 +139,7 @@ Use three independent critics for full QA: craft, clarity, and freshness. Use Cl
 
 Show this text if the user asks what the critics see:
 
-> The critics do not scroll through the whole video. SageCut measures every frame and Sage reads every frame first. The critics then look at the frames that SageCut picked, plus one contact sheet.
+> The critics do not scroll through the whole video. SageCut measures every frame and Clef reads every frame first. The critics then look at the frames that SageCut picked, plus one contact sheet.
 
 ## Brand and house rules
 

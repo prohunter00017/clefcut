@@ -10209,17 +10209,17 @@ var require_lib2 = __commonJS({
             reject(new FetchError(`Invalid response body while trying to fetch ${_this4.url}: ${err.message}`, "system", err));
           }
         });
-        body.on("data", function(chunk3) {
-          if (abort || chunk3 === null) {
+        body.on("data", function(chunk2) {
+          if (abort || chunk2 === null) {
             return;
           }
-          if (_this4.size && accumBytes + chunk3.length > _this4.size) {
+          if (_this4.size && accumBytes + chunk2.length > _this4.size) {
             abort = true;
             reject(new FetchError(`content size at ${_this4.url} over limit: ${_this4.size}`, "max-size"));
             return;
           }
-          accumBytes += chunk3.length;
-          accum.push(chunk3);
+          accumBytes += chunk2.length;
+          accum.push(chunk2);
         });
         body.on("end", function() {
           if (abort) {
@@ -11071,8 +11071,8 @@ var require_lib2 = __commonJS({
           }
           if (codings == "deflate" || codings == "x-deflate") {
             const raw = res.pipe(new PassThrough$1());
-            raw.once("data", function(chunk3) {
-              if ((chunk3[0] & 15) === 8) {
+            raw.once("data", function(chunk2) {
+              if ((chunk2[0] & 15) === 8) {
                 body = body.pipe(zlib3.createInflate());
               } else {
                 body = body.pipe(zlib3.createInflateRaw());
@@ -11652,7 +11652,6 @@ import path2 from "node:path";
 var DEFAULTS = {
   schedule: "sagecut/schedule.json",
   brand: "sagecut/brand.yaml",
-  plan: "developer",
   workers: 4,
   test_width: null,
   question_bank: null,
@@ -11665,7 +11664,10 @@ function loadConfig(root) {
   let cfg = {};
   if (fs2.existsSync(file)) cfg = import_yaml.default.parse(fs2.readFileSync(file, "utf8")) || {};
   const out = { ...DEFAULTS, ...cfg, root, file };
+  for (const k of ["schedule", "brand"]) if (typeof out[k] !== "string" || !out[k].trim()) out[k] = DEFAULTS[k];
+  if (!(Number.isInteger(out.workers) && out.workers >= 1)) out.workers = DEFAULTS.workers;
   out.schedulePath = path2.resolve(root, out.schedule);
+  out.questionBankPath = typeof out.question_bank === "string" && out.question_bank.trim() ? path2.resolve(root, out.question_bank) : null;
   out.brandPath = path2.resolve(root, out.brand);
   return out;
 }
@@ -11773,9 +11775,12 @@ async function probe(video, { root = process.cwd() } = {}) {
   const fps = den ? num3 / den : num3;
   const duration = Number(v.duration || j.format && j.format.duration || 0);
   const frames2 = v.nb_frames ? Number(v.nb_frames) : Math.round(duration * fps);
+  const rotation = Number(((v.side_data_list || []).find((d) => d.rotation !== void 0) || {}).rotation ?? (v.tags && v.tags.rotate) ?? 0) || 0;
+  const turned = Math.abs(rotation) % 180 === 90;
   return {
-    width: v.width,
-    height: v.height,
+    width: turned ? v.height : v.width,
+    height: turned ? v.width : v.height,
+    rotation,
     fps,
     frames: frames2,
     duration,
@@ -11799,15 +11804,18 @@ async function* frames(video, { root = process.cwd(), width, height, gray = true
     ["-v", "error", "-i", video, "-vf", vf.join(","), "-f", "image2pipe", "-c:v", "rawvideo", "-pix_fmt", pix, "pipe:1"],
     { env: t.env, windowsHide: true }
   );
-  let err = "";
+  let err = "", failed = null;
+  p.on("error", (e) => {
+    failed = e;
+  });
   p.stderr.on("data", (d) => {
     err += d.toString();
   });
   let buf = Buffer.alloc(0);
   let index = start;
   try {
-    for await (const chunk3 of p.stdout) {
-      buf = buf.length ? Buffer.concat([buf, chunk3]) : chunk3;
+    for await (const chunk2 of p.stdout) {
+      buf = buf.length ? Buffer.concat([buf, chunk2]) : chunk2;
       while (buf.length >= size) {
         yield { index: index++, data: buf.subarray(0, size) };
         buf = buf.subarray(size);
@@ -11816,7 +11824,8 @@ async function* frames(video, { root = process.cwd(), width, height, gray = true
   } finally {
     if (p.exitCode === null) p.kill();
   }
-  const code = await new Promise((r) => p.exitCode !== null ? r(p.exitCode) : p.on("close", r));
+  const code = await new Promise((r) => failed || p.exitCode !== null ? r(p.exitCode) : (p.once("close", r), p.once("error", () => r(null))));
+  if (failed) throw new Error(`ffmpeg could not start (${t.ffmpeg}): ${failed.message}. Run "sagecut doctor".`);
   if (code !== 0 && code !== null && index === start) throw new Error(`ffmpeg decode failed: ${err.trim().slice(0, 300)}`);
 }
 var IMAGE_FILE = /\.(png|jpe?g|webp|bmp|tiff?)$/i;
@@ -11851,17 +11860,26 @@ async function still(video, frame, { root = process.cwd(), fps, width = null, cr
 var toDataUri = (buf, format = "png") => `data:image/${format === "jpg" ? "jpeg" : "png"};base64,${buf.toString("base64")}`;
 async function loudness(video, { root = process.cwd() } = {}) {
   const r = await run("ffmpeg", ["-hide_banner", "-nostats", "-i", video, "-vn", "-af", "loudnorm=print_format=json", "-f", "null", "-"], { root });
-  const m = r.stderr.match(/\{[\s\S]*"input_i"[\s\S]*?\}/);
+  const m = r.stderr.match(/\{\s*"input_i"[\s\S]*?\}/);
   if (!m) return null;
-  const j = JSON.parse(m[0]);
-  return { lufs: Number(j.input_i), truePeak: Number(j.input_tp), lra: Number(j.input_lra) };
+  let j;
+  try {
+    j = JSON.parse(m[0]);
+  } catch {
+    return null;
+  }
+  const val = (v) => {
+    const x = Number(v);
+    return Number.isFinite(x) ? x : null;
+  };
+  return { lufs: val(j.input_i), truePeak: val(j.input_tp), lra: val(j.input_lra) };
 }
 
 // src/core/env.mjs
 import fs4 from "node:fs";
 import path4 from "node:path";
-var DEFAULT_ENDPOINT = "https://sage.levanto.ai";
-var KEY_PAGE = "https://levanto.ai";
+var DEFAULT_MODEL = "clef";
+var KEY_PAGE = "https://dash.cloudflare.com/profile/api-tokens";
 function parseDotenv(file) {
   const out = {};
   if (!fs4.existsSync(file)) return out;
@@ -11872,21 +11890,22 @@ function parseDotenv(file) {
     const k = line.slice(0, i).replace(/^export\s+/, "").trim();
     let v = line.slice(i + 1).trim();
     if (v.startsWith('"') && v.endsWith('"') || v.startsWith("'") && v.endsWith("'")) v = v.slice(1, -1);
+    else v = v.replace(/(^|\s+)#.*$/, "");
     out[k] = v;
   }
   return out;
 }
-function loadSageEnv(projectRoot = process.cwd()) {
+function loadClefEnv(projectRoot = process.cwd()) {
   const files = [path4.join(userDataDir(), ".env"), path4.join(process.cwd(), ".env"), path4.join(projectRoot, ".env")];
   const merged = {};
-  for (const f of files) Object.assign(merged, parseDotenv(f));
-  const key = process.env.SAGE_API_KEY || merged.SAGE_API_KEY || process.env.LEVANTO_API_KEY || merged.LEVANTO_API_KEY || "";
-  const endpoint = (process.env.SAGE_ENDPOINT || merged.SAGE_ENDPOINT || DEFAULT_ENDPOINT).replace(/\/+$/, "");
-  return { key, endpoint, hasKey: key.length > 0 };
+  for (const f of files) for (const [k, v] of Object.entries(parseDotenv(f))) if (v !== "") merged[k] = v;
+  const pick = (k) => (process.env[k] || merged[k] || "").trim();
+  const account = pick("CLOUDFLARE_ACCOUNT_ID"), token = pick("CLOUDFLARE_API_TOKEN");
+  return { account, token, model: pick("CLEF_MODEL") || DEFAULT_MODEL, hasKey: !!(account && token) };
 }
 var maskKey = (key) => key ? `\u2026${key.slice(-4)}` : "(none)";
 
-// src/core/sage.mjs
+// src/core/clef.mjs
 import path6 from "node:path";
 
 // src/core/log.mjs
@@ -11918,165 +11937,181 @@ var say = (...a) => {
 };
 var warn = (...a) => console.error(...a);
 
-// src/core/sage.mjs
-var MAX_GROUPS = 20;
-var BATCH_BYTES = 7e6;
-var PLAN_INPUT_USD = { developer: 0.05, starter: 0.046, pro: 0.042, growth: 0.038 };
-var OUTPUT_USD = 10;
-function sageUsd(usage2, plan = "developer") {
-  const inRate = (PLAN_INPUT_USD[plan] ?? PLAN_INPUT_USD.developer) / 1e6;
-  return ((usage2.billed_input_tokens || 0) + (usage2.image_tokens || 0)) * inRate + (usage2.output_tokens || 0) * (OUTPUT_USD / 1e6);
+// src/core/clef.mjs
+var CLEF_INPUT_USD = { clef: 0.24, "clef-flash": 0.038, "clef-omni": 0.15 };
+var NULL_BAND = 0.1;
+var STATE = "The image is the content to evaluate.";
+var MIN_AREA = 256 * 256;
+var MAX_AREA = 1024 * 1024;
+var MAX_PATCHES = 1024;
+var MARKERS = 3;
+var clefUrl = (account, model) => `https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/@cf/cloudflare/${model}`;
+function clefUsd(usage2, model = DEFAULT_MODEL) {
+  const rate = CLEF_INPUT_USD[model] ?? CLEF_INPUT_USD[DEFAULT_MODEL];
+  return ((usage2.billed_input_tokens || 0) + (usage2.image_tokens || 0)) * rate / 1e6;
+}
+function imageSize(uri) {
+  const m = /^data:image\/(png|jpeg);base64,(.*)$/s.exec(uri || "");
+  if (!m) return null;
+  const b = Buffer.from(m[1] === "png" ? m[2].slice(0, 44) : m[2], "base64");
+  if (m[1] === "png") return b.length >= 24 ? { w: b.readUInt32BE(16), h: b.readUInt32BE(20) } : null;
+  for (let i = 2; i + 9 < b.length; ) {
+    if (b[i] !== 255) return null;
+    const mk = b[i + 1];
+    if (mk >= 192 && mk <= 207 && ![196, 200, 204].includes(mk)) return { w: b.readUInt16BE(i + 7), h: b.readUInt16BE(i + 5) };
+    i += 2 + b.readUInt16BE(i + 2);
+  }
+  return null;
+}
+function imageTokens({ w, h }) {
+  const a = w * h, s = a < MIN_AREA ? Math.sqrt(MIN_AREA / a) : a > MAX_AREA ? Math.sqrt(MAX_AREA / a) : 1;
+  const side = (v) => Math.max(1, Math.round(v * s / 32));
+  return Math.min(MAX_PATCHES, side(w) * side(h)) + MARKERS;
+}
+var mediaOf = (g) => typeof g.content === "string" ? null : g.content.media || null;
+var groupImageTokens = (g) => {
+  const m = mediaOf(g);
+  if (!m) return 0;
+  const s = imageSize(m);
+  return s ? imageTokens(s) : MAX_PATCHES + MARKERS;
+};
+var levelsOf = (q2) => [...q2.levels].sort((a, b) => a.level - b.level);
+function toClefRequest(model, g) {
+  const media = mediaOf(g), text = typeof g.content === "string" ? g.content : g.content.text || "";
+  const questions = {};
+  g.questions.forEach((q2, i) => {
+    if (q2.kind === "yesno") questions[`q${i}`] = { type: "noul", instructions: q2.instructions };
+    else if (q2.kind === "scale") questions[`q${i}`] = { type: "score", instructions: q2.instructions, criteria: levelsOf(q2).map((l) => l.description) };
+    else throw new Error(`question ${q2.id}: Clef cannot answer kind "${q2.kind}" (only yesno and scale)`);
+  });
+  return { model, state: text || STATE, questions, ...media ? { images: [media] } : {} };
+}
+var noAnswer = (error) => ({ ok: false, answer: null, p: null, expectation: null, error });
+function readAnswers(g, answers = {}) {
+  return Object.fromEntries(g.questions.map((q2, i) => {
+    const a = answers[`q${i}`];
+    if (q2.kind === "scale") {
+      if (!a || typeof a.score !== "number") return [q2.id, noAnswer("no answer")];
+      const lv = levelsOf(q2), k = Math.min(Math.floor(a.score), lv.length - 1), f = a.score - k;
+      const expectation = k + 1 < lv.length ? lv[k].level + f * (lv[k + 1].level - lv[k].level) : lv[k].level;
+      return [q2.id, { ok: true, answer: null, p: null, expectation }];
+    }
+    if (!a || typeof a.noul !== "number") return [q2.id, noAnswer("no answer")];
+    const p = a.noul;
+    return [q2.id, { ok: true, answer: Math.abs(p - 0.5) < NULL_BAND ? null : p >= 0.5 ? "yes" : "no", p, expectation: null }];
+  }));
+}
+function estimateGroup(model, g) {
+  const req = toClefRequest(model, g), chars = req.state.length + JSON.stringify(req.questions).length, img = groupImageTokens(g), n = g.questions.length;
+  return { lo: img + Math.ceil(chars / 4) + 60 * n, hi: img + Math.ceil(chars / 3) + 80 * n + 30 };
 }
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-var groupBytes = (g) => (typeof g.content === "string" ? g.content.length : (g.content.media || "").length + (g.content.text || "").length) + JSON.stringify(g.questions).length + 64;
-function chunk(groups, { maxGroups = MAX_GROUPS, maxBytes = BATCH_BYTES } = {}) {
-  const out = [];
-  let cur = [];
-  let n = 0;
-  for (const g of groups) {
-    const s = groupBytes(g);
-    if (cur.length && (cur.length >= maxGroups || n + s > maxBytes)) {
-      out.push(cur);
-      cur = [];
-      n = 0;
-    }
-    cur.push(g);
-    n += s;
-  }
-  if (cur.length) out.push(cur);
-  return out;
-}
-var SageClient = class {
-  constructor({ root = process.cwd(), workers = 4, plan = "developer", tag = "sagecut" } = {}) {
-    const env = loadSageEnv(root);
+var fatal = (message, status2) => Object.assign(new Error(message), { fatal: true, status: status2 });
+var ClefClient = class {
+  constructor({ root = process.cwd(), workers = 4, tag = "sagecut", timeoutMs = 9e4 } = {}) {
+    const env = loadClefEnv(root);
     this.root = root;
-    this.key = env.key;
-    this.endpoint = env.endpoint;
-    this.workers = workers;
-    this.plan = plan;
+    this.workers = Math.max(1, Math.trunc(workers) || 4);
     this.tag = tag;
+    this.timeoutMs = timeoutMs;
+    this.account = env.account;
+    this.token = env.token;
+    this.model = env.model;
+    this.url = clefUrl(env.account, env.model);
   }
-  headers() {
-    if (!this.key) throw new Error('No Sage key. Put SAGE_API_KEY=... in your project .env file (run "sagecut doctor").');
-    return { Authorization: `Bearer ${this.key}`, "Content-Type": "application/json", "User-Agent": `sagecut/${VERSION}` };
+  // Commands call this first: it fails with the fix when the key or the model is wrong.
+  check() {
+    if (!this.account || !this.token) throw fatal('No Cloudflare key. Put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env file or ~/.sagecut/.env (run "sagecut doctor").');
+    if (CLEF_INPUT_USD[this.model] == null) throw fatal(`CLEF_MODEL "${this.model}" is not a Clef model. Use one of: ${Object.keys(CLEF_INPUT_USD).join(", ")}.`);
   }
-  async ready() {
-    try {
-      const r = await fetch(`${this.endpoint}/ready`, { headers: { "User-Agent": `sagecut/${VERSION}` } });
-      return { ok: r.status === 200, status: r.status };
-    } catch (e) {
-      return { ok: false, status: 0, error: e.message };
-    }
-  }
-  async post(route, payload, tries = 5) {
-    const body = JSON.stringify(payload);
+  async post(body, tries = 5) {
+    this.check();
+    const headers = { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json", "User-Agent": `sagecut/${VERSION}` };
+    const payload = JSON.stringify(body);
     for (let n = 0; n < tries; n++) {
       let r;
       try {
-        r = await fetch(`${this.endpoint}${route}`, { method: "POST", headers: this.headers(), body });
+        r = await fetch(this.url, { method: "POST", headers, body: payload, signal: AbortSignal.timeout(this.timeoutMs) });
       } catch (e) {
         if (n < tries - 1) {
           await sleep(2e3 * 2 ** n);
           continue;
         }
-        throw new Error(`Sage ${route}: ${e.message}`);
+        const timedOut = e.name === "TimeoutError" || e.name === "AbortError";
+        throw new Error(`Clef ${this.model}: ${timedOut ? `timed out after ${Math.round(this.timeoutMs / 1e3)} s` : e.message}`);
       }
-      if (r.status === 200) return r.json();
-      if (r.status === 413) {
-        const e = new Error("413");
-        e.code = 413;
-        throw e;
+      if (r.status === 200) {
+        const j = await r.json();
+        return j && j.result || j || {};
       }
       if ([429, 500, 502, 503, 504].includes(r.status) && n < tries - 1) {
         const ra = Number(r.headers.get("retry-after"));
         await sleep(Number.isFinite(ra) && ra > 0 ? ra * 1e3 : 2e3 * 2 ** n);
         continue;
       }
-      const text = (await r.text()).slice(0, 400);
-      if (r.status === 401 || r.status === 403) throw new Error(`Sage rejected the key (HTTP ${r.status}). Check SAGE_API_KEY in .env.`);
-      throw new Error(`Sage ${route} HTTP ${r.status}: ${text}`);
+      if (r.status === 401 || r.status === 403) throw fatal(`Cloudflare rejected the key (HTTP ${r.status}). Check CLOUDFLARE_API_TOKEN (it needs Workers AI permission) and CLOUDFLARE_ACCOUNT_ID in .env.`, r.status);
+      throw Object.assign(new Error(`Clef ${this.model} HTTP ${r.status}: ${(await r.text()).slice(0, 400)}`), { status: r.status });
     }
-    throw new Error(`Sage ${route}: no answer after ${tries} tries`);
+    throw new Error(`Clef ${this.model}: no answer after ${tries} tries`);
   }
-  async estimate(groups) {
-    const sum = { min_input_tokens: 0, max_input_tokens: 0, chunks: 0 };
+  // There is no health route: ask one tiny question, which also checks the key.
+  async ready() {
     try {
-      for (const c of chunk(groups)) {
-        const j = await this.post("/usage/estimate", { requests: c.map((g) => ({ content: g.content, questions: g.questions })) }, 2);
-        const u = j && j.usage || j || {};
-        sum.min_input_tokens += u.min_input_tokens || 0;
-        sum.max_input_tokens += u.max_input_tokens || 0;
-        sum.chunks++;
-      }
-      return sum;
-    } catch {
-      return null;
-    }
-  }
-  async callChunk(groups) {
-    try {
-      const j = await this.post("/decide/batch", { requests: groups.map((g) => ({ content: g.content, questions: g.questions })) });
-      return [{ groups, resp: j }];
+      await this.post({ model: this.model, state: "SageCut doctor check", questions: { q: { type: "noul", instructions: "Is this text a test?" } } }, 1);
+      return { ok: true, status: 200 };
     } catch (e) {
-      if (e.code === 413 && groups.length > 1) {
-        const h = Math.ceil(groups.length / 2);
-        return [...await this.callChunk(groups.slice(0, h)), ...await this.callChunk(groups.slice(h))];
-      }
-      throw e;
+      return { ok: false, status: e.status || 0, error: e.message };
     }
   }
+  estimate(groups) {
+    let lo = 0, hi = 0;
+    for (const g of groups) {
+      const e = estimateGroup(this.model, g);
+      lo += e.lo;
+      hi += e.hi;
+    }
+    return { lo, hi };
+  }
+  // One group (a picture and its questions) in one request.
+  async ask(g) {
+    const r = await this.post(toClefRequest(this.model, g));
+    const u = r.usage || {}, input = u.input_tokens || 0, img = Math.min(groupImageTokens(g), input);
+    return { answers: readAnswers(g, r.answers), usage: { billed_input_tokens: input - img, image_tokens: img, output_tokens: u.output_tokens || 0 } };
+  }
+  // Every group, `workers` requests at a time, rows in input order. A wrong key or model stops the run; any other
+  // failure (after the retries) makes that group's answers errors, never judgements.
   async decide(groups, { what = "decide" } = {}) {
     const t0 = Date.now();
-    const chunks = chunk(groups);
-    const results = new Array(chunks.length);
-    let next = 0;
+    const usage2 = { billed_input_tokens: 0, output_tokens: 0, image_tokens: 0, calls: 0 };
+    const rows = new Array(groups.length);
+    let next = 0, stop = null;
     const worker = async () => {
       for (; ; ) {
         const i = next++;
-        if (i >= chunks.length) return;
-        results[i] = await this.callChunk(chunks[i]);
+        if (stop || i >= groups.length) return;
+        const g = groups[i];
+        let answers;
+        try {
+          const r = await this.ask(g);
+          answers = r.answers;
+          for (const k of ["billed_input_tokens", "output_tokens", "image_tokens"]) usage2[k] += r.usage[k];
+        } catch (e) {
+          if (e.fatal) {
+            stop = e;
+            return;
+          }
+          answers = Object.fromEntries(g.questions.map((q2) => [q2.id, noAnswer(e.message)]));
+        }
+        usage2.calls++;
+        rows[i] = { id: g.id, label: g.label || String(g.id), answers };
       }
     };
-    await Promise.all(Array.from({ length: Math.min(this.workers, chunks.length) }, worker));
-    const usage2 = { billed_input_tokens: 0, output_tokens: 0, image_tokens: 0, calls: 0 };
-    const rows = [];
-    for (const parts of results) {
-      for (const { groups: gs, resp } of parts) {
-        usage2.calls++;
-        const u = resp.meta && resp.meta.usage || {};
-        usage2.billed_input_tokens += u.billed_input_tokens || 0;
-        usage2.output_tokens += u.output_tokens || u.billed_output_tokens || 0;
-        usage2.image_tokens += u.image_tokens || 0;
-        gs.forEach((g, i) => {
-          const gr = (resp.results || [])[i] || {};
-          const answers = {};
-          g.questions.forEach((q2, j) => {
-            const a = (gr.answers || [])[j] || {};
-            if (a.ok) {
-              const r = a.result && a.result.result || {};
-              const expectation = r.expectation ?? null;
-              answers[q2.id] = { answer: r.answer ?? null, p: r.probability ?? null, expectation, null: r.answer == null && expectation == null };
-            } else answers[q2.id] = { answer: null, p: null, expectation: null, null: true, error: a.error || "no answer" };
-          });
-          rows.push({ id: g.id, label: g.label || String(g.id), answers });
-        });
-      }
-    }
-    const usd = sageUsd(usage2, this.plan);
+    await Promise.all(Array.from({ length: Math.min(this.workers, groups.length) }, worker));
+    if (stop) throw stop;
+    const usd = clefUsd(usage2, this.model);
     const seconds = (Date.now() - t0) / 1e3;
-    appendJsonl(path6.join(metricsDir(this.root), "sage.jsonl"), { tag: this.tag, what, groups: groups.length, ...usage2, usd: Number(usd.toFixed(6)), plan: this.plan, seconds });
+    appendJsonl(path6.join(metricsDir(this.root), "clef.jsonl"), { tag: this.tag, what, groups: groups.length, ...usage2, usd: Number(usd.toFixed(6)), model: this.model, seconds });
     return { rows, usage: usage2, usd, seconds };
-  }
-  // One yes/no question on many images. images: [{ id, label, media }] (media = data URI)
-  async yesno(images, instructions, opts = {}) {
-    const groups = images.map((im) => ({
-      id: im.id,
-      label: im.label,
-      content: { kind: "image", media: im.media },
-      questions: [{ id: "q", kind: "yesno", instructions }]
-    }));
-    const r = await this.decide(groups, opts);
-    return { ...r, rows: r.rows.map((row) => ({ id: row.id, label: row.label, ...row.answers.q })) };
   }
 };
 
@@ -12146,11 +12181,20 @@ function validateBrand(b) {
   if (!b.name) errors.push('missing "name"');
   const c = b.colors || {};
   for (const k of ["background", "text", "primary"]) if (!HEX.test(c[k] || "")) errors.push(`colors.${k} must be a #RRGGBB hex value`);
-  for (const v of [...c.accent || [], ...c.allowed || []]) if (!HEX.test(v)) errors.push(`colour ${v} is not a #RRGGBB hex value`);
+  for (const v of [...Array.isArray(c.accent) ? c.accent : [], ...Array.isArray(c.allowed) ? c.allowed : []]) if (!HEX.test(v)) errors.push(`colour ${v} is not a #RRGGBB hex value`);
   if (!b.fonts || !b.fonts.heading || !b.fonts.heading.family) errors.push("fonts.heading.family is missing");
   if (b.format && !["16:9", "9:16", "1:1"].includes(b.format)) errors.push("format must be 16:9, 9:16 or 1:1");
   const m = b.motion || {};
   if (m.style && !["restrained", "energetic"].includes(m.style)) errors.push("motion.style must be restrained or energetic");
+  const list = (v, where) => {
+    if (v != null && !Array.isArray(v)) errors.push(`${where} must be a list, like [a, b] (got ${JSON.stringify(v)})`);
+  };
+  list(c.accent, "colors.accent");
+  list(c.allowed, "colors.allowed");
+  list((b.logo || {}).files, "logo.files");
+  list((b.copy || {}).avoid, "copy.avoid");
+  list(m.designed, "motion.designed");
+  for (const [role, f] of Object.entries(b.fonts || {})) if (f && typeof f === "object") list(f.weights, `fonts.${role}.weights`);
   return errors;
 }
 function loadBrand(file, { required = false } = {}) {
@@ -12229,9 +12273,21 @@ function normalize(s) {
   s.static_holds = s.static_holds || [];
   return s;
 }
+function clipSchedule(s, n) {
+  const last = n - 1, cl = (f) => Math.min(f, last), start = (c) => Array.isArray(c) ? c[0] : c;
+  const beats = s.beats.filter((b) => b.start <= last).map((b) => ({
+    ...b,
+    end: cl(b.end),
+    ...Array.isArray(b.hold) ? { hold: [cl(b.hold[0]), cl(b.hold[1])] } : {},
+    elements: (b.elements || []).filter((e) => e.in <= last).map((e) => e.out != null ? { ...e, out: cl(e.out) } : e)
+  }));
+  const transitions = (s.transitions || []).filter((t) => t.frames[0] <= last).map((t) => ({ ...t, frames: [t.frames[0], cl(t.frames[1])] }));
+  return { ...s, beats, transitions, cuts: (s.cuts || []).filter((c) => start(c) <= last) };
+}
+var beatAt = (s, f) => s.beats.find((b) => f >= b.start && f <= b.end) || null;
 
 // src/commands/doctor.mjs
-var help = "check Node, ffmpeg, the Sage key and server, OCR, brand and schedule";
+var help = "check Node, ffmpeg, the Cloudflare key and the Clef model, OCR, brand and schedule";
 async function checks(ctx) {
   const out = [];
   const add = (name, status2, detail, fix) => out.push({ name, status: status2, detail, ...fix ? { fix } : {} });
@@ -12251,22 +12307,7 @@ async function checks(ctx) {
   } catch (e) {
     add("ffmpeg", "fail", e.message.split("\n")[0], 'Run "npm install" in your Remotion project (it installs @remotion/compositor-*), or set SAGECUT_FFMPEG and SAGECUT_FFPROBE.');
   }
-  const env = loadSageEnv(root);
-  if (env.hasKey) add("sage key", "pass", `SAGE_API_KEY present (${maskKey(env.key)})`);
-  else add("sage key", "fail", "SAGE_API_KEY not found", `Make a key at ${KEY_PAGE}, then put SAGE_API_KEY=... in your project's .env file.`);
-  const client = new SageClient({ root });
-  const rd = await client.ready();
-  if (rd.ok) add("sage server", "pass", `${env.endpoint}/ready answered 200`);
-  else add("sage server", "fail", `${env.endpoint}/ready ${rd.status ? "answered " + rd.status : "did not answer"}`, "Check your network and SAGE_ENDPOINT. If this persists, see sagecut/qa/reference/troubleshooting.md.");
-  if (env.hasKey && rd.ok) {
-    try {
-      await client.post("/usage/estimate", { requests: [{ content: "SageCut doctor check", questions: [{ id: "q", kind: "yesno", instructions: "Is this text a test?" }] }] }, 1);
-      add("sage key check", "pass", "the server accepted the key (POST /usage/estimate answered 200)");
-    } catch (e) {
-      if (/rejected the key/.test(e.message)) add("sage key check", "fail", "the server rejected the key", `the server rejected the key: check SAGE_API_KEY in .env, make a key at ${KEY_PAGE}`);
-      else add("sage key check", "warn", `could not check the key: ${e.message.replace(env.key, "(key)").split("\n")[0].slice(0, 160)}`, 'Run "sagecut doctor" again; if it persists see sagecut/qa/reference/troubleshooting.md.');
-    }
-  }
+  await clefChecks(root, add);
   try {
     const o = await createOcr();
     await o.close();
@@ -12292,6 +12333,23 @@ async function checks(ctx) {
     }
   } else add("schedule", "warn", `no schedule at ${ctx.config.schedule}`, 'Run "sagecut init".');
   return out;
+}
+async function clefChecks(root, add) {
+  const env = loadClefEnv(root), model = `@cf/cloudflare/${env.model}`;
+  const fix = `Make an API token with the Workers AI permission at ${KEY_PAGE}, then put CLOUDFLARE_ACCOUNT_ID=... and CLOUDFLARE_API_TOKEN=... in your project .env or ~/.sagecut/.env.`;
+  if (env.hasKey) add("clef key", "pass", `CLOUDFLARE_ACCOUNT_ID (${maskKey(env.account)}) and CLOUDFLARE_API_TOKEN (${maskKey(env.token)}) present, model ${env.model}`);
+  else {
+    add("clef key", "fail", "CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN not found", fix);
+    return;
+  }
+  const rd = await new ClefClient({ root }).ready();
+  if (rd.ok) add("clef model", "pass", `Workers AI ${model} answered a test question`);
+  else add(
+    "clef model",
+    "fail",
+    `Workers AI ${model}: ${String(rd.error || `HTTP ${rd.status}`).split(env.token).join("(key)").split("\n")[0].slice(0, 160)}`,
+    rd.status === 401 || rd.status === 403 ? fix : "Check your network, CLOUDFLARE_ACCOUNT_ID and CLEF_MODEL (clef, clef-flash or clef-omni). If this persists, see the troubleshooting reference of the skill (references/troubleshooting.md)."
+  );
 }
 async function run2(argv, ctx) {
   const { values } = parseArgs({ args: argv, options: { json: { type: "boolean" }, root: { type: "string" }, help: { type: "boolean" } } });
@@ -12377,7 +12435,7 @@ async function run3(argv, ctx) {
     height,
     safe_margin_px: Math.round(width * 0.05),
     _help: 'Element role (optional): headline | body | caption | url sets the legibility floor. effects: designed effects, { kind: "flash" | "glitch", frames: [first, last] }; the brand motion.designed list only skips findings inside declared cuts, transitions and effects. static_holds: [[first, last]] declares holds longer than 1.5 s.',
-    beats: [{ id: "intro", start: 0, end: frames2, elements: [{ id: "title", in: 0, out: frames2, text: "Your title", role: "headline" }] }],
+    beats: [{ id: "intro", start: 0, end: frames2 - 1, elements: [{ id: "title", in: 0, out: frames2 - 1, text: "Your title", role: "headline" }] }],
     transitions: [],
     effects: []
   }, null, 2) + "\n");
@@ -12755,6 +12813,10 @@ var attr = (tag, name) => {
   const m = tag.match(new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
   return m ? m[2] ?? m[3] ?? m[4] : null;
 };
+function siteName(html, u) {
+  const raw = (metaContent(html, "og:site_name") || (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || "").trim();
+  return raw.split(/\s*[|–—]\s*|\s+-\s+/)[0].trim().slice(0, 60) || u.hostname.replace(/^www\./, "");
+}
 function findLogos(html, base) {
   const cands = [];
   const regions = [...html.matchAll(/<(header|nav)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => m[2]);
@@ -12768,8 +12830,9 @@ function findLogos(html, base) {
     for (const m of r.matchAll(/<img\b[^>]*>/gi)) {
       const src = attr(m[0], "src");
       if (!src || src.startsWith("data:")) continue;
-      const hint = /logo|brand|wordmark/i.test(m[0]);
-      cands.push({ kind: "img", url: abs(src, base), score: (hint ? 95 : 60) - (/white|reverse|dark|inverse/i.test(src) ? 20 : 0) });
+      const hint = /logo|brand|wordmark/i.test(m[0]), url = abs(src, base);
+      if (!url || !/^https?:/.test(url)) continue;
+      cands.push({ kind: "img", url, score: (hint ? 95 : 60) - (/white|reverse|dark|inverse/i.test(src) ? 20 : 0) });
     }
   }
   for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
@@ -12869,7 +12932,7 @@ async function brandFromUrl(urlStr, { root, log = () => {
     const src = pickFontSource(merged.faces, family);
     fonts[role] = { family, weights: src ? src.weights : [400, 700], ...src ? { url: src.url } : {} };
   }
-  const name = (metaContent(html, "og:site_name") || (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || u.hostname.replace(/^www\./, "")).trim().split(/\s*[|–—-]\s*/)[0].slice(0, 60) || u.hostname;
+  const name = siteName(html, u);
   const cands = findLogos(html, base);
   const assetsDir = path9.join(root, "sagecut", "brand-assets");
   const logoFiles = [];
@@ -13029,7 +13092,7 @@ function brandFromFolder(dirArg, { root }) {
         if (ext === ".svg") score += 30;
         if (/logo/.test(base)) score += 20;
         if (/wordmark|lockup/.test(base)) score += 5;
-        if (/(white|reverse|dark|mono|negative|favicon|icon)/.test(base)) score -= 15;
+        if (/(white|reverse|dark|mono|negative|favicon|icon)/i.test(path10.relative(dir, f))) score -= 15;
         let size = null;
         if (ext === ".png") {
           size = pngSize(fs12.readFileSync(f).subarray(0, 32));
@@ -13117,7 +13180,8 @@ function brandFromFolder(dirArg, { root }) {
   const logoFiles = [];
   for (const l of logos.slice(0, 2)) {
     fs12.mkdirSync(assetsDir, { recursive: true });
-    const dest = path10.join(assetsDir, path10.basename(l.file));
+    let dest = path10.join(assetsDir, path10.basename(l.file));
+    if (logoFiles.includes(path10.relative(root, dest).split(path10.sep).join("/"))) dest = path10.join(assetsDir, `${path10.basename(path10.dirname(l.file))}-${path10.basename(l.file)}`);
     fs12.copyFileSync(l.file, dest);
     logoFiles.push(path10.relative(root, dest).split(path10.sep).join("/"));
   }
@@ -13180,8 +13244,17 @@ async function installFonts(brand, { root, brandDir }) {
     const weights = (f.weights && f.weights.length ? f.weights : [400]).map(Number);
     const files = {};
     try {
-      const local = f.file && [path11.resolve(root, f.file), path11.resolve(brandDir, f.file), path11.resolve(root, "public", f.file)].find((p) => fs13.existsSync(p));
-      if (local) {
+      const findLocal = (rel) => rel && [path11.resolve(root, rel), path11.resolve(brandDir, rel), path11.resolve(root, "public", rel)].find((p) => fs13.existsSync(p));
+      const local = findLocal(f.file);
+      const localSet = f.files && typeof f.files === "object" ? Object.entries(f.files).map(([w, rel]) => [w, findLocal(rel)]) : [];
+      if (localSet.length && localSet.every(([, p]) => p)) {
+        for (const [w, p] of localSet) {
+          const dest = path11.join(outDir, path11.basename(p));
+          if (path11.resolve(p) !== path11.resolve(dest)) fs13.copyFileSync(p, dest);
+          files[w] = `fonts/${path11.basename(p)}`;
+        }
+        msgs.push(`${role}: ${f.family} (${Object.keys(files).join(", ")}) -> public/fonts/`);
+      } else if (local) {
         const dest = path11.join(outDir, path11.basename(local));
         if (path11.resolve(local) !== path11.resolve(dest)) fs13.copyFileSync(local, dest);
         files[weights[0]] = `fonts/${path11.basename(local)}`;
@@ -13207,6 +13280,8 @@ async function installFonts(brand, { root, brandDir }) {
       f.file = files[first];
       f.files = files;
     } catch (e) {
+      delete f.file;
+      delete f.files;
       msgs.push(`WARNING ${role}: could not get ${f.family} (${e.message}). Add the font file to public/fonts/ and set fonts.${role}.file.`);
     }
   }
@@ -13274,6 +13349,34 @@ ${faces.map((f) => `  { family: ${q2(f.family)}, weight: ${q2(f.weight)}, url: s
 export const loadBrandFonts = () => Promise.all(FONT_FACES.map((f) => loadFont(f)));
 `;
 }
+function saveBrand(brand, { root, brandDir }) {
+  const brands = ensureDir(path11.join(userDataDir(), "brands")), s = slug(brand.name), own = path11.join(brands, s);
+  const copy = JSON.parse(JSON.stringify(brand));
+  const keep = (src, sub) => {
+    if (!src || !fs13.existsSync(src)) return null;
+    const dest = path11.join(ensureDir(path11.join(own, sub)), path11.basename(src));
+    if (path11.resolve(src) !== path11.resolve(dest)) fs13.copyFileSync(src, dest);
+    return path11.relative(brands, dest).split(path11.sep).join("/");
+  };
+  const pub = (rel) => rel && path11.resolve(root, "public", rel);
+  for (const f of Object.values(copy.fonts || {})) {
+    if (!f || typeof f !== "object") continue;
+    if (f.files && typeof f.files === "object") for (const [w, rel] of Object.entries(f.files)) {
+      const k = keep(pub(rel), "fonts");
+      if (k) f.files[w] = k;
+    }
+    if (f.file) {
+      const k = keep(pub(f.file), "fonts");
+      if (k) f.file = k;
+    }
+  }
+  if (copy.logo && Array.isArray(copy.logo.files)) {
+    copy.logo.files = copy.logo.files.map((rel) => keep([path11.resolve(root, rel), path11.resolve(brandDir, rel)].find((p) => fs13.existsSync(p)), "logo") || rel);
+  }
+  const saved = path11.join(brands, `${s}.yaml`);
+  fs13.writeFileSync(saved, import_yaml3.default.stringify(copy));
+  return saved;
+}
 async function setBrand(file, { root, log = console.log }) {
   const brandDir = path11.dirname(path11.resolve(file));
   const brand = readBrandFile(file);
@@ -13292,8 +13395,7 @@ async function setBrand(file, { root, log = console.log }) {
   fs13.writeFileSync(dest, import_yaml3.default.stringify(brand));
   ensureDir(path11.join(root, "src"));
   fs13.writeFileSync(path11.join(root, "src", "brand.ts"), brandTs(brand, logos.public));
-  const saved = path11.join(ensureDir(path11.join(userDataDir(), "brands")), `${slug(brand.name)}.yaml`);
-  fs13.writeFileSync(saved, import_yaml3.default.stringify(brand));
+  const saved = saveBrand(brand, { root, brandDir });
   msgs.push(`wrote sagecut/brand.yaml, src/brand.ts and ${saved}`);
   for (const m of msgs) log(m);
   return { brand, messages: msgs, saved };
@@ -13537,14 +13639,13 @@ __export(gate_exports, {
   help: () => help5,
   run: () => run6
 });
-import fs20 from "node:fs";
-import path18 from "node:path";
+import fs21 from "node:fs";
+import path19 from "node:path";
 import { parseArgs as parseArgs5 } from "node:util";
 
 // src/gate/pipeline.mjs
-import fs19 from "node:fs";
-import path17 from "node:path";
-import crypto from "node:crypto";
+import fs20 from "node:fs";
+import path18 from "node:path";
 
 // src/gate/consts.mjs
 var MEASURE_W = 480;
@@ -13602,6 +13703,7 @@ var CELL_STAB = 0.3;
 var CELL_IMAGE_SHARE = 0.5;
 var CELL_CUT_AFTER = 4;
 var CADENCE_MIN = 3;
+var CADENCE_MAX_GAP = 30;
 var LUMA_ABS = 1.2;
 var LUMA_K = 8;
 var BLACK_LUMA = 4;
@@ -13629,6 +13731,52 @@ var FLOOR_REF_W = 1080;
 var OCR_TO_TYPE = 0.7;
 var FLOOR_TOLERANCE = 0.9;
 var DEFAULT_TEST_WIDTH = 350;
+
+// src/core/frozen.mjs
+var FROZEN_MAX_DIFF = 0.25;
+var FROZEN_MIN_SECONDS = 1.5;
+function holdRanges(schedule) {
+  const out = [];
+  for (const h of schedule && schedule.static_holds || []) {
+    if (Array.isArray(h) && h.length >= 2) out.push([Number(h[0]), Number(h[1])]);
+    else if (h && Array.isArray(h.frames)) out.push([Number(h.frames[0]), Number(h.frames[1])]);
+    else if (h && typeof h === "object") {
+      const a = h.start ?? h.from ?? h.in, b = h.end ?? h.to ?? h.out;
+      if (a !== void 0 && b !== void 0) out.push([Number(a), Number(b)]);
+    }
+  }
+  return out.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+}
+function covered(s, e, holds, tol = 2) {
+  let pos = s;
+  const sorted = [...holds].sort((a, b) => a[0] - b[0]);
+  for (const [a, b] of sorted) {
+    if (a - tol <= pos && b >= pos) pos = b + 1;
+    if (pos > e - tol + 0) break;
+  }
+  return pos >= e - tol + 1 || pos > e;
+}
+function runs(flags, minLen) {
+  const out = [];
+  let s = -1;
+  for (let i = 0; i <= flags.length; i++) {
+    if (i < flags.length && flags[i]) {
+      if (s < 0) s = i;
+    } else if (s >= 0) {
+      if (i - s >= minLen) out.push([s, i - 1]);
+      s = -1;
+    }
+  }
+  return out;
+}
+function identicalRuns(diffs, { maxDiff = FROZEN_MAX_DIFF, skip = null } = {}) {
+  const flags = Array.from(diffs, (d, f) => f > 0 && d < maxDiff && !(skip && skip[f]));
+  return runs(flags, 1).map(([s, e]) => [s - 1, e]);
+}
+function longFreezes(diffs, fps, holds = [], skip = null) {
+  const limit = Math.ceil(FROZEN_MIN_SECONDS * fps);
+  return identicalRuns(diffs, { skip }).filter(([s, e]) => e - s + 1 > limit).map(([s, e]) => ({ frames: [s, e], length: e - s + 1, seconds: (e - s + 1) / fps, held: covered(s, e, holds) }));
+}
 
 // src/gate/util.mjs
 function median(arr) {
@@ -13675,6 +13823,14 @@ async function mapLimit(items, limit, fn) {
 function windows(v) {
   return (v || []).map((x) => Array.isArray(x) ? [Math.trunc(x[0]), Math.trunc(x[1])] : [Math.trunc(x), Math.trunc(x)]);
 }
+function declaredHolds(sched) {
+  const out = holdRanges(sched);
+  for (const b of sched && sched.beats || []) {
+    if (Array.isArray(b.hold)) out.push([Number(b.hold[0]), Number(b.hold[1])]);
+    else if (b.hold !== void 0 && b.hold !== null) out.push([Number(b.hold), Number(b.end)]);
+  }
+  return out.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+}
 var inWindows = (f, wins, pad = 0) => wins.some(([a, b]) => a - pad <= f && f <= b + pad);
 var rectOf = (x) => (x && x.rect || x).map(Number);
 function rectsAt(items, frame) {
@@ -13695,52 +13851,6 @@ function designedWindows(sched) {
     if (DESIGNED_NOTE.test(note) && DESIGNED_KIND.test(note)) out.push([Math.trunc(t.frames[0]), Math.trunc(t.frames[1])]);
   }
   return out;
-}
-
-// src/core/frozen.mjs
-var FROZEN_MAX_DIFF = 0.25;
-var FROZEN_MIN_SECONDS = 1.5;
-function holdRanges(schedule) {
-  const out = [];
-  for (const h of schedule && schedule.static_holds || []) {
-    if (Array.isArray(h) && h.length >= 2) out.push([Number(h[0]), Number(h[1])]);
-    else if (h && Array.isArray(h.frames)) out.push([Number(h.frames[0]), Number(h.frames[1])]);
-    else if (h && typeof h === "object") {
-      const a = h.start ?? h.from ?? h.in, b = h.end ?? h.to ?? h.out;
-      if (a !== void 0 && b !== void 0) out.push([Number(a), Number(b)]);
-    }
-  }
-  return out.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
-}
-function covered(s, e, holds, tol = 2) {
-  let pos = s;
-  const sorted = [...holds].sort((a, b) => a[0] - b[0]);
-  for (const [a, b] of sorted) {
-    if (a - tol <= pos && b >= pos) pos = b + 1;
-    if (pos > e - tol + 0) break;
-  }
-  return pos >= e - tol + 1 || pos > e;
-}
-function runs(flags, minLen) {
-  const out = [];
-  let s = -1;
-  for (let i = 0; i <= flags.length; i++) {
-    if (i < flags.length && flags[i]) {
-      if (s < 0) s = i;
-    } else if (s >= 0) {
-      if (i - s >= minLen) out.push([s, i - 1]);
-      s = -1;
-    }
-  }
-  return out;
-}
-function identicalRuns(diffs, { maxDiff = FROZEN_MAX_DIFF, skip = null } = {}) {
-  const flags = Array.from(diffs, (d, f) => f > 0 && d < maxDiff && !(skip && skip[f]));
-  return runs(flags, 1).map(([s, e]) => [s - 1, e]);
-}
-function longFreezes(diffs, fps, holds = [], skip = null) {
-  const limit = Math.ceil(FROZEN_MIN_SECONDS * fps);
-  return identicalRuns(diffs, { skip }).filter(([s, e]) => e - s + 1 > limit).map(([s, e]) => ({ frames: [s, e], length: e - s + 1, seconds: (e - s + 1) / fps, held: covered(s, e, holds) }));
 }
 
 // src/gate/series.mjs
@@ -13816,7 +13926,9 @@ async function scanVideo(video, { root, skip = [] }) {
 }
 function basics(g) {
   const n = g.length, P = g[0].length;
-  const paper = Math.trunc(medianU8(g[0]));
+  const ms = [];
+  for (let f = 0; f < n; f += Math.max(1, Math.floor(n / 60))) ms.push(medianU8(g[f]));
+  const paper = Math.trunc(median(ms));
   const ink = new Float64Array(n), diff = new Float64Array(n), L = new Float64Array(n);
   for (let f = 0; f < n; f++) {
     const a = g[f];
@@ -13902,6 +14014,7 @@ function measureBeats(g, B, sched, fps, excused, designed) {
     return { window: ti, frames: [a, b], frame: f, diff: r3(diff[f]), median_in_window: r3(median(Array.from(diff.subarray(lo, hi + 1)))) };
   });
   const settled = sched.beats.map((b) => {
+    if (n < 5) return { beat: b.id, frame: Math.max(0, Math.min(n - 1, Math.round((b.start + b.end) / 2))), score: null, settled: false };
     let [h0, h1] = b.hold || [b.start, b.end];
     h0 = Math.max(2, h0);
     h1 = Math.min(n - 3, h1);
@@ -14125,8 +14238,9 @@ function findCellPops(g, excusedCell, designed, regions, FW, FH) {
   const cad = /* @__PURE__ */ new Set();
   let i = 0;
   while (i < frames2.length) {
+    const g0 = i + 1 < frames2.length ? frames2[i + 1] - frames2[i] : Infinity;
     let j = i + 1;
-    while (j < frames2.length && Math.abs(frames2[j] - frames2[j - 1] - (i + 1 < frames2.length ? frames2[i + 1] - frames2[i] : 0)) <= 1) j++;
+    if (g0 <= CADENCE_MAX_GAP) while (j < frames2.length && Math.abs(frames2[j] - frames2[j - 1] - g0) <= 1) j++;
     if (j - i >= CADENCE_MIN) {
       for (let q2 = i; q2 < j; q2++) cad.add(frames2[q2]);
       i = j;
@@ -14417,12 +14531,12 @@ function edgeCheck(frame, margin, allow) {
     strong[i] = d > EDGE_STRONG ? 1 : 0;
   }
   if (allow.size) {
-    const B = EDGE_BLOCK, hb = Math.floor(h / B), wb = Math.floor(w / B);
+    const B = EDGE_BLOCK, hb = Math.ceil(h / B), wb = Math.ceil(w / B);
     const blk = new Uint8Array(hb * wb);
-    for (let y = 0; y < hb * B; y++) for (let x = 0; x < wb * B; x++) if (struct[y * w + x]) blk[(y / B | 0) * wb + (x / B | 0)] = 1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (struct[y * w + x]) blk[(y / B | 0) * wb + (x / B | 0)] = 1;
     const ex = edgeExempt(dilate(blk, hb, wb), hb, wb, allow);
-    for (let y = 0; y < hb * B; y++) {
-      for (let x = 0; x < wb * B; x++) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
         if (ex[(y / B | 0) * wb + (x / B | 0)]) {
           struct[y * w + x] = 0;
           strong[y * w + x] = 0;
@@ -14869,10 +14983,19 @@ function textChecks(beat, lines, frame, W, H, masks, png) {
   }
   return out;
 }
+function dropLinesIn(lines, rects) {
+  if (!rects || !rects.length) return lines;
+  return lines.filter((l) => {
+    const cx = l.x + l.w / 2, cy = l.y + l.h / 2;
+    return !rects.some(([x0, y0, x1, y1]) => cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1);
+  });
+}
 
-// src/gate/images.mjs
+// src/sweep/images.mjs
 import fs16 from "node:fs";
 import path14 from "node:path";
+import crypto from "node:crypto";
+import zlib2 from "node:zlib";
 
 // src/core/png.mjs
 import zlib from "node:zlib";
@@ -14890,7 +15013,7 @@ function crc32(buf) {
   for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 255] ^ c >>> 8;
   return (c ^ 4294967295) >>> 0;
 }
-function chunk2(type, data) {
+function chunk(type, data) {
   const len = Buffer.alloc(4);
   len.writeUInt32BE(data.length);
   const td = Buffer.concat([Buffer.from(type, "ascii"), data]);
@@ -14917,9 +15040,9 @@ function encodePng(pixels, width, height, channels = 3) {
   ihdr[12] = 0;
   return Buffer.concat([
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk2("IHDR", ihdr),
-    chunk2("IDAT", zlib.deflateSync(raw, { level: 6 })),
-    chunk2("IEND", Buffer.alloc(0))
+    chunk("IHDR", ihdr),
+    chunk("IDAT", zlib.deflateSync(raw, { level: 6 })),
+    chunk("IEND", Buffer.alloc(0))
   ]);
 }
 function paste(canvas, cw, tile, tw, th, x, y) {
@@ -14932,7 +15055,133 @@ function paste(canvas, cw, tile, tw, th, x, y) {
   }
 }
 
+// src/sweep/images.mjs
+var escapeRe = (s) => s.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+function segmentRe(seg) {
+  let out = "";
+  for (const ch of seg) out += ch === "*" ? "[^/\\\\]*" : ch === "?" ? "[^/\\\\]" : escapeRe(ch);
+  return new RegExp(`^${out}$`);
+}
+function expandGlob(pattern, cwd = process.cwd()) {
+  const norm = pattern.replace(/\\/g, "/");
+  const abs2 = path14.isAbsolute(pattern) || /^[a-zA-Z]:\//.test(norm);
+  const parts = norm.split("/").filter((p, i) => p !== "" || i === 0);
+  let bases = [abs2 ? norm.startsWith("/") ? "/" : parts.shift() + "/" : cwd];
+  if (abs2 && norm.startsWith("/")) parts.shift();
+  const out = [];
+  const walk2 = (dir, i) => {
+    if (i === parts.length) {
+      out.push(dir);
+      return;
+    }
+    const seg = parts[i];
+    if (seg === "**") {
+      walk2(dir, i + 1);
+      for (const d of safeDirs(dir)) walk2(path14.join(dir, d), i);
+      return;
+    }
+    if (!/[*?]/.test(seg)) {
+      const next = path14.join(dir, seg);
+      if (fs16.existsSync(next)) walk2(next, i + 1);
+      return;
+    }
+    const re = segmentRe(seg);
+    let names = [];
+    try {
+      names = fs16.readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const n of names.sort()) if (re.test(n)) walk2(path14.join(dir, n), i + 1);
+  };
+  for (const b of bases) walk2(b, 0);
+  return [...new Set(out)].sort().filter((p) => {
+    try {
+      return fs16.statSync(p).isFile();
+    } catch {
+      return false;
+    }
+  });
+}
+function safeDirs(dir) {
+  try {
+    return fs16.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith(".") && d.name !== "node_modules").map((d) => d.name);
+  } catch {
+    return [];
+  }
+}
+function decodePng(buf) {
+  if (buf.readUInt32BE(0) !== 2303741511) throw new Error("not a PNG");
+  let pos = 8;
+  let w = 0;
+  let h = 0;
+  let ct = 0;
+  const idat = [];
+  while (pos < buf.length) {
+    const len = buf.readUInt32BE(pos);
+    const type = buf.toString("ascii", pos + 4, pos + 8);
+    const data = buf.subarray(pos + 8, pos + 8 + len);
+    if (type === "IHDR") {
+      w = data.readUInt32BE(0);
+      h = data.readUInt32BE(4);
+      ct = data[9];
+      if (data[8] !== 8 || data[12] !== 0) throw new Error("only 8-bit non-interlaced PNG is supported");
+    } else if (type === "IDAT") idat.push(data);
+    else if (type === "IEND") break;
+    pos += 12 + len;
+  }
+  const ch = { 0: 1, 2: 3, 6: 4 }[ct];
+  if (!ch) throw new Error(`unsupported PNG colour type ${ct}`);
+  const raw = zlib2.inflateSync(Buffer.concat(idat));
+  const stride = w * ch;
+  const px = Buffer.alloc(h * stride);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)];
+    const src = y * (stride + 1) + 1;
+    const dst = y * stride;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= ch ? px[dst + x - ch] : 0;
+      const b = y > 0 ? px[dst - stride + x] : 0;
+      const c = x >= ch && y > 0 ? px[dst - stride + x - ch] : 0;
+      let v = raw[src + x];
+      if (f === 1) v += a;
+      else if (f === 2) v += b;
+      else if (f === 3) v += a + b >> 1;
+      else if (f === 4) {
+        const pa = Math.abs(b - c);
+        const pb = Math.abs(a - c);
+        const pc = Math.abs(a + b - 2 * c);
+        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      px[dst + x] = v & 255;
+    }
+  }
+  if (ch === 3) return { rgb: px, w, h };
+  const rgb = Buffer.alloc(w * h * 3);
+  for (let i = 0; i < w * h; i++) for (let k = 0; k < 3; k++) rgb[i * 3 + k] = ch === 1 ? px[i] : px[i * 4 + k];
+  return { rgb, w, h };
+}
+async function decodeFrame(video, frame, { root, width, fps }) {
+  return decodePng(await still(video, frame, { root, fps: fps || 1, width }));
+}
+async function decodeImageFile(file, { root, width }) {
+  const info = await probe(file, { root });
+  const w = Math.min(width, info.width);
+  const r = await run("ffmpeg", ["-v", "error", "-i", file, "-frames:v", "1", "-vf", `scale=${w}:-2:flags=lanczos,format=rgb24`, "-f", "image2pipe", "-c:v", "png", "pipe:1"], { root });
+  if (r.code !== 0 || !r.stdout.length) throw new Error(`could not read image ${file}: ${r.stderr.trim().slice(0, 200)}`);
+  return decodePng(r.stdout);
+}
+var pngUri = ({ rgb, w, h }) => `data:image/png;base64,${encodePng(rgb, w, h, 3).toString("base64")}`;
+function fileSha12(file) {
+  return new Promise((resolve, reject) => {
+    const h = crypto.createHash("sha256");
+    fs16.createReadStream(file).on("data", (d) => h.update(d)).on("end", () => resolve(h.digest("hex").slice(0, 12))).on("error", reject);
+  });
+}
+
 // src/gate/images.mjs
+import fs17 from "node:fs";
+import path15 from "node:path";
 async function rawFrame(video, frame, { root, fps, w, h, scale = false }) {
   const t = Math.max(0, (frame - 0.25) / fps);
   const vf = [];
@@ -14986,9 +15235,9 @@ function resizeRGB({ w, h, data }, tw, th) {
 }
 var toPng = ({ w, h, data }) => encodePng(Buffer.isBuffer(data) ? data : Buffer.from(data.buffer, data.byteOffset, data.length), w, h, 3);
 function writePng(file, img) {
-  fs16.mkdirSync(path14.dirname(file), { recursive: true });
+  fs17.mkdirSync(path15.dirname(file), { recursive: true });
   const buf = toPng(img);
-  fs16.writeFileSync(file, buf);
+  fs17.writeFileSync(file, buf);
   return buf;
 }
 function outline(img, boxes2, color = [255, 0, 0], width = 5, pad = 6) {
@@ -15093,78 +15342,32 @@ function makeSheet(cells, { cellW = 480, cols = 4, scale = 3 } = {}) {
 
 // src/gate/bank.mjs
 var import_yaml5 = __toESM(require_dist(), 1);
-import fs17 from "node:fs";
-import path15 from "node:path";
-var defaultBankPath = () => path15.join(pluginRoot(), "assets", "bank", "gate-default.yaml");
+import fs18 from "node:fs";
+import path16 from "node:path";
+var defaultBankPath = () => path16.join(pluginRoot(), "assets", "bank", "gate-default.yaml");
 function loadBank(file) {
-  if (!fs17.existsSync(file)) throw new Error(`Question bank not found: ${file}`);
-  const bank = import_yaml5.default.parse(fs17.readFileSync(file, "utf8"));
+  if (!fs18.existsSync(file)) throw new Error(`Question bank not found: ${file}`);
+  const bank = import_yaml5.default.parse(fs18.readFileSync(file, "utf8"));
   if (!bank || !Array.isArray(bank.questions)) throw new Error(`Question bank ${file} has no "questions" list`);
   return { path: file, questions: Object.fromEntries(bank.questions.map((q2) => [q2.id, q2])) };
 }
 function renderQuestion(q2, params = {}) {
+  const missing = [...q2.instructions.matchAll(/\{([a-z_]+)\}/g)].map((m) => m[1]).filter((k) => typeof params[k] !== "string");
+  if (missing.length) throw new Error(`question ${q2.id}: unfilled placeholder {${missing[0]}} in "${q2.instructions.slice(0, 100)}"`);
   let instr = q2.instructions;
   for (const [k, v] of Object.entries(params)) if (typeof v === "string") instr = instr.split(`{${k}}`).join(v);
-  if (/\{[a-z_]+\}/.test(instr)) throw new Error(`question ${q2.id}: unfilled placeholder in "${instr.slice(0, 100)}"`);
   const out = { id: q2.id, kind: q2.kind, instructions: instr.trim() };
   if (q2.kind === "scale") out.levels = q2.levels.map((l) => ({ level: l.level, description: l.description }));
   return out;
 }
-async function askSage(client, groups, { maxBilled, onEstimate = () => {
+async function askClef(client, groups, { maxBilled, onEstimate = () => {
 } } = {}) {
-  const t0 = Date.now();
-  const chunks = chunk(groups.map((g, i) => ({ ...g, id: i })));
-  let lo = 0, hi = 0;
-  for (const c of chunks) {
-    const e = await client.estimate(c);
-    if (e) {
-      lo += e.min_input_tokens || 0;
-      hi += e.max_input_tokens || 0;
-    }
-  }
-  onEstimate({ lo, hi, groups: groups.length, chunks: chunks.length });
-  if (hi > maxBilled) throw new Error(`Sage estimate ${hi.toLocaleString("en-US")} input tokens is above --max-billed ${maxBilled.toLocaleString("en-US")}. Raise the limit or send fewer frames.`);
-  const answers = /* @__PURE__ */ new Map(), usage2 = { billed_input_tokens: 0, output_tokens: 0, image_tokens: 0, calls: 0 };
-  let next = 0;
-  const worker = async () => {
-    for (; ; ) {
-      const i = next++;
-      if (i >= chunks.length) return;
-      let results;
-      try {
-        results = await client.callChunk(chunks[i]);
-      } catch (err) {
-        for (const g of chunks[i]) answers.set(g.id, new Map(g.questions.map((q2) => [q2.id, { ok: false, error: err.message }])));
-        continue;
-      }
-      for (const { groups: gs, resp } of results) {
-        usage2.calls++;
-        const u = resp.meta && resp.meta.usage || {};
-        usage2.billed_input_tokens += u.billed_input_tokens || 0;
-        usage2.output_tokens += u.output_tokens || u.billed_output_tokens || 0;
-        usage2.image_tokens += u.image_tokens || 0;
-        gs.forEach((g, k) => {
-          const gr = (resp.results || [])[k] || {};
-          const m = /* @__PURE__ */ new Map();
-          g.questions.forEach((q2, j) => {
-            const a = (gr.answers || [])[j] || {};
-            const rid = a.result && a.result.id;
-            const ans = rid && rid !== q2.id ? (gr.answers || []).find((x) => x.result && x.result.id === q2.id) || a : a;
-            if (ans.ok) {
-              const r = ans.result && ans.result.result || {};
-              m.set(q2.id, { ok: true, answer: r.answer ?? null, p: r.probability ?? null, expectation: r.expectation ?? null });
-            } else m.set(q2.id, { ok: false, error: ans.error || "no answer" });
-          });
-          answers.set(g.id, m);
-        });
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(client.workers, chunks.length) }, worker));
-  const usd = sageUsd(usage2, client.plan);
-  const seconds = (Date.now() - t0) / 1e3;
-  appendJsonl(path15.join(metricsDir(client.root), "sage.jsonl"), { tag: "gate", what: "gate", groups: groups.length, ...usage2, usd: Number(usd.toFixed(6)), plan: client.plan, seconds });
-  return { answers, usage: usage2, usd, estimate: [lo, hi], calls: usage2.calls, seconds };
+  const e = client.estimate(groups);
+  onEstimate({ ...e, groups: groups.length });
+  if (e.hi > maxBilled) throw new Error(`Clef estimate ${e.hi.toLocaleString("en-US")} input tokens is above --max-billed ${maxBilled.toLocaleString("en-US")}. Raise the limit or send fewer frames.`);
+  const r = await client.decide(groups.map((g, i) => ({ ...g, id: i })), { what: "gate" });
+  const answers = new Map(r.rows.map((row) => [row.id, new Map(Object.entries(row.answers))]));
+  return { answers, usage: r.usage, usd: r.usd, estimate: [e.lo, e.hi], calls: r.usage.calls, seconds: r.seconds };
 }
 function judge(q2, ans) {
   if (!ans || !ans.ok) return { status: "error", answer: null, p: null, note: `no answer: ${ans && ans.error || "no response"}` };
@@ -15185,8 +15388,8 @@ function judge(q2, ans) {
 }
 
 // src/gate/critic.mjs
-import path16 from "node:path";
-import fs18 from "node:fs";
+import path17 from "node:path";
+import fs19 from "node:fs";
 var MAX_CRITIC_FRAMES = 32;
 var CAPS = { finding: 10, beat: 8, transition: 6, element: 8, motion: 6 };
 function topMotionFrames(d, n = CAPS.motion) {
@@ -15199,7 +15402,7 @@ function topMotionFrames(d, n = CAPS.motion) {
   return out;
 }
 function frameOfRow(row) {
-  const [a, b] = row.frames;
+  const a = row.frames[0], b = row.frames[row.frames.length - 1];
   return b === a + 1 ? b : a + b >> 1;
 }
 function evenly(list, k) {
@@ -15211,7 +15414,7 @@ function evenly(list, k) {
 function selectCriticFrames({ sched, settled, rows, beatOf, max = MAX_CRITIC_FRAMES, total, motion = [] }) {
   const sorted = [...rows].sort((a, b) => (SEVERITY_RANK[a.severity] ?? 2.5) - (SEVERITY_RANK[b.severity] ?? 2.5) || a.frames[0] - b.frames[0]);
   const q2 = {
-    finding: sorted.map((r) => ({ frame: frameOfRow(r), reason: `${r.source === "sage" ? "Sage" : "measured"} ${r.check}` })),
+    finding: sorted.map((r) => ({ frame: frameOfRow(r), reason: `${r.source === "clef" ? "Clef" : "measured"} ${r.check}` })),
     beat: evenly(settled.map((s) => ({ frame: s.frame, reason: `beat ${s.beat} settled frame` })), CAPS.beat),
     transition: (sched.transitions || []).map((t) => ({ frame: Math.round((t.frames[0] + t.frames[1]) / 2), reason: `transition ${t.from || "?"} to ${t.to || "?"} midpoint` })),
     element: (sched.beats || []).flatMap((b) => (b.elements || []).flatMap((e) => [
@@ -15241,18 +15444,18 @@ function selectCriticFrames({ sched, settled, rows, beatOf, max = MAX_CRITIC_FRA
   return chosen.sort((a, b) => a.frame - b.frame);
 }
 async function writeCriticFrames(dir, video, info, picks, { root, thumbW = 320 }) {
-  fs18.mkdirSync(dir, { recursive: true });
+  fs19.mkdirSync(dir, { recursive: true });
   const w = Math.min(info.width, 1280), h = Math.round(info.height * w / info.width);
   const imgs = await mapLimit(picks, 4, (p) => rawFrame(video, p.frame, { root, fps: info.fps, w, h, scale: w !== info.width }));
   const index = picks.map((p, i) => {
     const file = `f${String(p.frame).padStart(5, "0")}.png`;
-    writePng(path16.join(dir, file), imgs[i]);
+    writePng(path17.join(dir, file), imgs[i]);
     return { frame: p.frame, beat: p.beat, reason: p.reason, file };
   });
-  writeJson(path16.join(dir, "index.json"), { video: path16.basename(video), fps: info.fps, frames: index });
+  writeJson(path17.join(dir, "index.json"), { video: path17.basename(video), fps: info.fps, frames: index });
   if (picks.length) {
     const cells = picks.map((p, i) => ({ img: resizeRGB(imgs[i], thumbW, Math.round(imgs[i].h * thumbW / imgs[i].w)), label: `f${p.frame}  ${timecode(p.frame, info.fps)}` }));
-    writePng(path16.join(dir, "contact.png"), makeSheet(cells, { cellW: thumbW, cols: picks.length <= 12 ? 4 : 6, scale: 2 }));
+    writePng(path17.join(dir, "contact.png"), makeSheet(cells, { cellW: thumbW, cols: picks.length <= 12 ? 4 : 6, scale: 2 }));
   }
   return index;
 }
@@ -15276,9 +15479,6 @@ function designedBy(row, designed, wins) {
   const inside = (name) => (wins[name] || []).some(([a, b, pad]) => ra >= a - pad && rb <= b + pad);
   const hit = (name, ok) => designed.has(name) && ok && inside(name) ? name : null;
   return hit("flash", c === "luma_pop" || c === "abrupt_motion" && kind === "glitch" || c === "black_frames" && (row.length || rb - ra + 1) <= 3) || hit("hard_cut", c === "abrupt_motion" && kind !== "glitch" || c === "motion_jump" || c === "local_pop" || c === "pop" || c === "abrupt_change" || c === "seam_jump") || hit("glitch", c === "abrupt_motion" && kind === "glitch" || c === "luma_pop" || c === "fireflies" || c === "local_pop") || null;
-}
-function sha12(file) {
-  return crypto.createHash("sha256").update(fs19.readFileSync(file)).digest("hex").slice(0, 12);
 }
 function sheetFrames(beat) {
   const first = Math.min(...beat.elements.map((e) => e.in));
@@ -15304,7 +15504,7 @@ function sheetFrames(beat) {
 }
 var expectedOrder = (beat) => {
   const txt = Object.fromEntries(beat.elements.map((e) => [e.id, e.order_text || e.text || e.id]));
-  const order = beat.order || [...beat.elements].sort((a, b) => a.in - b.in).map((e) => e.id);
+  const order = Array.isArray(beat.order) ? beat.order : [...beat.elements].sort((a, b) => a.in - b.in).map((e) => e.id);
   return order.map((i) => txt[i]).join(", then ");
 };
 var WHAT = (testW) => ({
@@ -15317,26 +15517,27 @@ var WHAT = (testW) => ({
   hierarchy: "the reading order is unclear"
 });
 async function runGate(opts) {
-  const { video, root, config, outDir, noSage = false, noOcr = false, maxBilled = 2e5 } = opts;
+  const { video, root, config, outDir, noClef = false, noOcr = false, maxBilled = 2e5 } = opts;
   const t0 = Date.now(), started = (/* @__PURE__ */ new Date()).toISOString().slice(0, 19);
   const skipped = [];
-  if (!fs19.existsSync(video)) throw new Error(`Video not found: ${video}`);
+  if (!fs20.existsSync(video)) throw new Error(`Video not found: ${video}`);
   const schedPath = opts.schedulePath || config.schedulePath;
-  if (!fs19.existsSync(schedPath)) throw new Error(`No schedule at ${schedPath}. Run "sagecut init", or pass --schedule FILE.`);
-  const sched = loadSchedule(schedPath);
+  if (!fs20.existsSync(schedPath)) throw new Error(`No schedule at ${schedPath}. Run "sagecut init", or pass --schedule FILE.`);
+  let sched = loadSchedule(schedPath);
+  const schedFrames = sched.frames;
   const brand = loadBrand(opts.brandPath || config.brandPath);
-  const bank = loadBank(opts.bankPath || config.question_bank || defaultBankPath());
+  const bank = loadBank(opts.bankPath || config.questionBankPath || defaultBankPath());
   const qs = bank.questions;
   const info = await probe(video, { root });
   const { fps } = info, FW = info.width, FH = info.height;
-  fs19.mkdirSync(path17.join(outDir, "img"), { recursive: true });
-  const rel = (p) => path17.relative(outDir, p).split(path17.sep).join("/");
-  const imgDir = path17.join(outDir, "img");
+  fs20.mkdirSync(path18.join(outDir, "img"), { recursive: true });
+  const rel = (p) => path18.relative(outDir, p).split(path18.sep).join("/");
+  const imgDir = path18.join(outDir, "img");
   if (Math.abs((sched.fps || fps) - fps) > 0.01 || sched.width && (sched.width !== FW || sched.height !== FH)) {
     skipped.push(`schedule says ${sched.width}x${sched.height} at ${sched.fps} fps, the video is ${FW}x${FH} at ${fps} fps: check the schedule`);
   }
   const margin = Number.isFinite(Number(sched.safe_margin_px)) ? Number(sched.safe_margin_px) : 96;
-  const cuts = windows(sched.cuts), holds = windows(sched.static_holds);
+  const cuts = windows(sched.cuts), holds = declaredHolds(sched);
   const allowEdge = new Set(edgeContactSides(sched.allow_edge_contact) || []);
   const seams = (sched.seams || []).map(Number);
   const masks = (sched.masks || []).filter((m) => m && typeof m === "object" && m.rect).map((m) => ({ ...m, rect: m.rect.map(Number) }));
@@ -15353,18 +15554,19 @@ async function runGate(opts) {
     if (!declared) notes.push(`brand allows ${e}; declare its frames in schedule ${e === "hard_cut" ? "cuts" : "effects"} so QA can skip them`);
   }
   const testW = Number(config.test_width) || brand && TEST_WIDTH[brand.format] || DEFAULT_TEST_WIDTH;
-  if (!sched.static_holds || !sched.static_holds.length) skipped.push("static_holds not declared: frozen frames judged by context (a film that never stands still, or the same area resuming with a jump)");
+  if (!holds.length) skipped.push("no holds declared (beat hold or static_holds): frozen frames judged by context (a film that never stands still, or the same area resuming with a jump)");
   if (!seams.length) skipped.push("seams not declared: seam check uses the generic spike check only");
   if (!masks.length) skipped.push("masks not declared: type-over-object skipped");
-  say(`${GATE_VERSION}: measuring ${path17.basename(video)}`);
+  say(`${GATE_VERSION}: measuring ${path18.basename(video)}`);
   const g = await decodeGrey(video, { root });
   const B = basics(g);
   const n = B.n;
+  sched = clipSchedule(sched, n);
   const M = measureBeats(g, B, sched, fps, excused, designedWins);
   const tS = (f) => Math.round(f / fps * 100) / 100;
   const beats = Object.fromEntries(sched.beats.map((b) => [b.id, b]));
   const settled = Object.fromEntries(M.settled.map((s) => [s.beat, s]));
-  const beatOf = (f) => (sched.beats.find((b) => b.start <= f && f < b.end) || {}).id ?? null;
+  const beatOf = (f) => (beatAt(sched, f) || {}).id ?? null;
   const skip960 = imgRegions.filter((x) => x.grain).map((x) => [x.rect[0] * SCAN_W / FW, x.rect[1] * SCAN_H / FH, x.rect[2] * SCAN_W / FW, x.rect[3] * SCAN_H / FH, x.frames || null]);
   const scan = await scanVideo(video, { root, skip: skip960 });
   const d = B.diff, inkPct = Array.from(B.ink, (v) => v * 100);
@@ -15397,14 +15599,31 @@ async function runGate(opts) {
     measureRows.push(row);
     add(row, kind);
   };
+  if (schedFrames && Math.abs(n - schedFrames) > 1) {
+    const f = Math.max(0, Math.min(n, schedFrames) - 1);
+    addMeasure("finding", {
+      id: "frame_count",
+      check: "frame_count",
+      source: "measure",
+      beat: null,
+      frames: [f],
+      t_s: tS(f),
+      severity: "blocker",
+      evidence: `The video has ${n} frames; the schedule says ${schedFrames}. ${n < schedFrames ? `The render is short: frames ${n}-${schedFrames - 1} are missing and were not checked.` : "The render is longer than the schedule."} Render the whole composition, or fix the schedule.`,
+      clef_answer: null,
+      clef_p: null,
+      image: null,
+      crop: null
+    });
+  }
   const crop = (name, im, boxes2, color) => {
     const drawn = boxes2 && boxes2.length ? outline(im, boxes2, color) : im;
-    const file = path17.join(imgDir, `${name}.png`);
+    const file = path18.join(imgDir, `${name}.png`);
     writePng(file, shrink(drawn, CROP_W));
     return rel(file);
   };
   const full = (name, im) => {
-    const file = path17.join(imgDir, `${name}.png`);
+    const file = path18.join(imgDir, `${name}.png`);
     const buf = writePng(file, im);
     return { path: rel(file), buf };
   };
@@ -15446,8 +15665,8 @@ async function runGate(opts) {
       t_s: tS(a),
       severity: r.severity,
       evidence: r.evidence,
-      sage_answer: null,
-      sage_p: null,
+      clef_answer: null,
+      clef_p: null,
       image: r._image,
       crop: r._image,
       metrics: Object.fromEntries(Object.entries(r).filter(([k]) => !["check", "kind", "severity", "frames", "evidence"].includes(k) && !k.startsWith("_")))
@@ -15473,134 +15692,137 @@ async function runGate(opts) {
     skipped.push('Brand colour check skipped: no brand file with a palette (run "sagecut brand")');
   }
   const plab = palette ? paletteLab(palette) : null;
-  const edgeRows = [], colourSeen = /* @__PURE__ */ new Map(), sageGroups = [];
+  const edgeRows = [], colourSeen = /* @__PURE__ */ new Map(), clefGroups = [];
   const metas = [];
-  const mediaOf = async (buf, f) => {
+  const mediaOf2 = async (buf, f) => {
     if (buf.length > JPEG_OVER && f != null) return toDataUri(await still(video, f, { root, fps, format: "jpg", quality: 2 }), "jpg");
     return toDataUri(buf, "png");
   };
   const addGroup = (media, items) => {
-    const gi = sageGroups.length;
-    sageGroups.push({ content: { kind: "image", media }, questions: items.map(([qid, params]) => renderQuestion(qs[qid], params)) });
+    const gi = clefGroups.length;
+    clefGroups.push({ content: { kind: "image", media }, questions: items.map(([qid, params]) => renderQuestion(qs[qid], params)) });
     items.forEach(([qid, , meta]) => metas.push({ gi, qid, meta }));
   };
   let ocrFailed = null;
-  for (const b of sched.beats) {
-    const bid = b.id, s = settled[bid], f = s.frame;
-    const frm = await grabFull(f);
-    const { path: fullPath, buf: pngBuf } = full(`${bid}-f${f}`, frm);
-    const cropPath = crop(`${bid}-f${f}-crop`, frm);
-    const base = { beat: bid, frames: [f], t_s: tS(f), image: cropPath, crop: cropPath, settled: s.settled };
-    const e = edgeCheck(frm, Math.round(margin * FH / (sched.height || FH)), allowEdge);
-    edgeRows.push({ beat: bid, frame: f, ...Object.fromEntries(["left", "right", "top", "bottom"].map((k) => [k, e.res[k] ?? null])) });
-    if (Object.keys(e.res).length) {
-      const ec = crop(`edge-${bid}-f${f}`, frm, e.boxes);
-      const worst = Object.entries(e.res).reduce((p, q2) => q2[1] < p[1] ? q2 : p);
-      addMeasure("finding", {
-        id: `edge_margin-${bid}-f${f}`,
-        check: "edge_margin",
-        source: "measure",
-        beat: bid,
-        frames: [f],
-        t_s: tS(f),
-        severity: "major",
-        evidence: `Text or graphics reach ${worst[1]} px from the ${worst[0]} edge on the settled frame (safe margin ${margin} px); edges hit: ${Object.entries(e.res).map(([k, v]) => `${k} ${v} px`).join(", ")}` + (allowEdge.size ? `. Objects connected to ${[...allowEdge].join(",")} are exempt.` : "."),
-        sage_answer: null,
-        sage_p: null,
-        image: ec,
-        crop: ec
-      });
-    }
-    if (plab) {
-      const cc = colourCheck(frm, palette, plab, rectsAt(imgRegions, f));
-      for (const c of cc.rows) {
-        if (colourSeen.has(c.hex)) {
-          colourSeen.get(c.hex).beats.push(bid);
-          continue;
-        }
-        const ccrop = crop(`colour-${bid}-f${f}`, frm, [c.bbox], [255, 0, 255]);
-        const row = {
-          id: `brand_colour-${bid}-f${f}`,
-          check: "brand_colour",
+  try {
+    for (const b of sched.beats) {
+      const bid = b.id, s = settled[bid], f = s.frame;
+      const frm = await grabFull(f);
+      const { path: fullPath, buf: pngBuf } = full(`${bid}-f${f}`, frm);
+      const cropPath = crop(`${bid}-f${f}-crop`, frm);
+      const base = { beat: bid, frames: [f], t_s: tS(f), image: cropPath, crop: cropPath, settled: s.settled };
+      const e = edgeCheck(frm, Math.round(margin * FH / (sched.height || FH)), allowEdge);
+      edgeRows.push({ beat: bid, frame: f, ...Object.fromEntries(["left", "right", "top", "bottom"].map((k) => [k, e.res[k] ?? null])) });
+      if (Object.keys(e.res).length) {
+        const ec = crop(`edge-${bid}-f${f}`, frm, e.boxes);
+        const worst = Object.entries(e.res).reduce((p, q2) => q2[1] < p[1] ? q2 : p);
+        addMeasure("finding", {
+          id: `edge_margin-${bid}-f${f}`,
+          check: "edge_margin",
           source: "measure",
           beat: bid,
           frames: [f],
           t_s: tS(f),
           severity: "major",
-          evidence: `${c.share_pct}% of the frame is flat ${c.hex}, CIEDE2000 ${c.delta_e} from the nearest palette colour ${c.nearest} (limit ${COLOUR_DE.toFixed(1)}).`,
-          sage_answer: null,
-          sage_p: null,
-          image: ccrop,
-          crop: ccrop,
-          beats: [bid]
-        };
-        colourSeen.set(c.hex, row);
-        addMeasure("finding", row);
+          evidence: `Text or graphics reach ${worst[1]} px from the ${worst[0]} edge on the settled frame (safe margin ${margin} px); edges hit: ${Object.entries(e.res).map(([k, v]) => `${k} ${v} px`).join(", ")}` + (allowEdge.size ? `. Objects connected to ${[...allowEdge].join(",")} are exempt.` : "."),
+          clef_answer: null,
+          clef_p: null,
+          image: ec,
+          crop: ec
+        });
       }
+      if (plab) {
+        const cc = colourCheck(frm, palette, plab, rectsAt(imgRegions, f));
+        for (const c of cc.rows) {
+          if (colourSeen.has(c.hex)) {
+            colourSeen.get(c.hex).beats.push(bid);
+            continue;
+          }
+          const ccrop = crop(`colour-${bid}-f${f}-${c.hex.slice(1)}`, frm, [c.bbox], [255, 0, 255]);
+          const row = {
+            id: `brand_colour-${bid}-f${f}-${c.hex.slice(1)}`,
+            check: "brand_colour",
+            source: "measure",
+            beat: bid,
+            frames: [f],
+            t_s: tS(f),
+            severity: "major",
+            evidence: `${c.share_pct}% of the frame is flat ${c.hex}, CIEDE2000 ${c.delta_e} from the nearest palette colour ${c.nearest} (limit ${COLOUR_DE.toFixed(1)}).`,
+            clef_answer: null,
+            clef_p: null,
+            image: ccrop,
+            crop: ccrop,
+            beats: [bid]
+          };
+          colourSeen.set(c.hex, row);
+          addMeasure("finding", row);
+        }
+      }
+      let lines = null;
+      if (ocr && !ocrFailed) {
+        try {
+          lines = dropLinesIn(normaliseLines((await ocr.read(pngBuf)).lines), rectsAt(imgRegions, f));
+        } catch (err) {
+          ocrFailed = err.message;
+          skipped.push(`OCR failed: ${err.message} (text checks skipped; type over masks uses ink colour)`);
+        }
+      }
+      const maskHit = /* @__PURE__ */ new Set();
+      if (lines) {
+        for (const r of textChecks(b, lines, f, FW, FH, masks, frm)) {
+          if (r.check === "type_over_object") maskHit.add(r.mask);
+          const tc = r.bbox ? crop(`${r.check}-${bid}-f${f}-${r.element ?? r.mask}`, frm, [[r.bbox[0], r.bbox[1], r.bbox[0] + r.bbox[2], r.bbox[1] + r.bbox[3]]], [255, 128, 0]) : cropPath;
+          addMeasure(r.kind, {
+            id: `${r.check}-${bid}-f${f}-${r.element ?? r.mask}`,
+            check: r.check,
+            source: "measure",
+            beat: bid,
+            frames: [f],
+            t_s: tS(f),
+            severity: r.severity,
+            evidence: r.evidence,
+            clef_answer: null,
+            clef_p: null,
+            image: tc,
+            crop: tc
+          });
+        }
+      }
+      const darkest = palette && [...palette].filter((t) => t !== "#000000").sort((p, q2) => hexRgb(p).reduce((x, y) => x + y) - hexRgb(q2).reduce((x, y) => x + y))[0];
+      const inkHex = brand && brand.colors && brand.colors.text || darkest;
+      const maskRest = masks.filter((m) => !maskHit.has(m.id));
+      if (maskRest.length && inkHex) {
+        for (const r of maskInkCheck(frm, maskRest, f, inkHex)) {
+          const bb = r.bbox, tc = crop(`type_over_object-${bid}-f${f}-${r.mask}`, frm, [[bb[0], bb[1], bb[0] + bb[2], bb[1] + bb[3]]], [255, 128, 0]);
+          addMeasure("finding", {
+            id: `type_over_object-${bid}-f${f}-${r.mask}`,
+            check: "type_over_object",
+            source: "measure",
+            beat: bid,
+            frames: [f],
+            t_s: tS(f),
+            severity: r.severity,
+            evidence: r.evidence,
+            clef_answer: null,
+            clef_p: null,
+            image: tc,
+            crop: tc
+          });
+        }
+      }
+      if (noClef) continue;
+      const mk = (q2) => ({ ...base, id: `${q2}-${bid}-f${f}`, check: q2 });
+      addGroup(await mediaOf2(pngBuf, f), ["overlap", "text_integrity", "hierarchy"].map((q2) => [q2, {}, mk(q2)]));
+      const feedW = Math.min(testW, FW), feed = resizeRGB(frm, feedW, Math.round(FH * feedW / FW));
+      const fp = full(`${bid}-f${f}-test${feedW}`, feed);
+      addGroup(toDataUri(fp.buf, "png"), [["legible_feed", {}, { ...mk("legible_feed"), image: cropPath }]]);
     }
-    let lines = null;
-    if (ocr && !ocrFailed) {
+  } finally {
+    if (ocr) {
       try {
-        lines = normaliseLines((await ocr.read(pngBuf)).lines);
-      } catch (err) {
-        ocrFailed = err.message;
-        skipped.push(`OCR failed: ${err.message} (text checks skipped; type over masks uses ink colour)`);
+        await ocr.close();
+      } catch {
       }
-    }
-    const maskHit = /* @__PURE__ */ new Set();
-    if (lines) {
-      for (const r of textChecks(b, lines, f, FW, FH, masks, frm)) {
-        if (r.check === "type_over_object") maskHit.add(r.mask);
-        const tc = r.bbox ? crop(`${r.check}-${bid}-f${f}`, frm, [[r.bbox[0], r.bbox[1], r.bbox[0] + r.bbox[2], r.bbox[1] + r.bbox[3]]], [255, 128, 0]) : cropPath;
-        addMeasure(r.kind, {
-          id: `${r.check}-${bid}-f${f}-${r.element ?? r.mask}`,
-          check: r.check,
-          source: "measure",
-          beat: bid,
-          frames: [f],
-          t_s: tS(f),
-          severity: r.severity,
-          evidence: r.evidence,
-          sage_answer: null,
-          sage_p: null,
-          image: tc,
-          crop: tc
-        });
-      }
-    }
-    const darkest = palette && [...palette].filter((t) => t !== "#000000").sort((p, q2) => hexRgb(p).reduce((x, y) => x + y) - hexRgb(q2).reduce((x, y) => x + y))[0];
-    const inkHex = brand && brand.colors && brand.colors.text || darkest;
-    const maskRest = masks.filter((m) => !maskHit.has(m.id));
-    if (maskRest.length && inkHex) {
-      for (const r of maskInkCheck(frm, maskRest, f, inkHex)) {
-        const bb = r.bbox, tc = crop(`type_over_object-${bid}-f${f}`, frm, [[bb[0], bb[1], bb[0] + bb[2], bb[1] + bb[3]]], [255, 128, 0]);
-        addMeasure("finding", {
-          id: `type_over_object-${bid}-f${f}-${r.mask}`,
-          check: "type_over_object",
-          source: "measure",
-          beat: bid,
-          frames: [f],
-          t_s: tS(f),
-          severity: r.severity,
-          evidence: r.evidence,
-          sage_answer: null,
-          sage_p: null,
-          image: tc,
-          crop: tc
-        });
-      }
-    }
-    if (noSage) continue;
-    const mk = (q2) => ({ ...base, id: `${q2}-${bid}-f${f}`, check: q2 });
-    addGroup(await mediaOf(pngBuf, f), ["overlap", "text_integrity", "hierarchy"].map((q2) => [q2, {}, mk(q2)]));
-    const feedW = Math.min(testW, FW), feed = resizeRGB(frm, feedW, Math.round(FH * feedW / FW));
-    const fp = full(`${bid}-f${f}-test${feedW}`, feed);
-    addGroup(toDataUri(fp.buf, "png"), [["legible_feed", {}, { ...mk("legible_feed"), image: cropPath }]]);
-  }
-  if (ocr) {
-    try {
-      await ocr.close();
-    } catch {
     }
   }
   const popJobs = /* @__PURE__ */ new Map(), abruptJobs = /* @__PURE__ */ new Map();
@@ -15621,7 +15843,7 @@ async function runGate(opts) {
   for (const f of [...abruptJobs.keys()]) if (popJobs.has(f)) abruptJobs.delete(f);
   const deadJobs = M.dead.map((d0) => ({ run: d0, frame: d0.frames[0] + d0.frames[1] >> 1 }));
   const deadMeta = /* @__PURE__ */ new Map();
-  if (!noSage) {
+  if (!noClef) {
     const sheetBeats = sched.beats.filter((b) => b.elements.length);
     const sheetImgs = await mapLimit(
       sheetBeats.flatMap((b) => sheetFrames(b).map((x) => [b.id, Math.max(0, Math.min(n - 1, x))])),
@@ -15677,27 +15899,31 @@ async function runGate(opts) {
     const c = crop(`dead-f${f}-crop`, frm);
     const meta = { beat: beatOf(f), frames: dj.run.frames, t_s: tS(dj.run.frames[0]), id: `dead_frame-f${f}`, check: "dead_frame", image: c, crop: c, run: dj.run };
     deadMeta.set(dj.run.frames[0], meta);
-    if (!noSage) addGroup(await mediaOf(fp.buf, f), [["dead_frame", {}, meta]]);
+    if (!noClef) addGroup(await mediaOf2(fp.buf, f), [["dead_frame", {}, meta]]);
   }
-  let answers = /* @__PURE__ */ new Map(), usage2 = { billed_input_tokens: 0, output_tokens: 0, image_tokens: 0 }, sageInfo = { calls: 0, estimate: [0, 0], seconds: 0, usd: 0 };
-  if (!noSage) {
-    const client = new SageClient({ root, workers: config.workers, plan: config.plan, tag: "gate" });
-    if (!client.key) throw new Error("No Sage key. Put SAGE_API_KEY=... in your project .env file, or run with --no-sage (measurement only).");
-    const r = await askSage(client, sageGroups, { maxBilled, onEstimate: (e) => say(`${GATE_VERSION} estimate: ${sageGroups.reduce((a, g2) => a + g2.questions.length, 0)} questions, ${e.groups} images, ${e.chunks} batches, ${e.lo.toLocaleString("en-US")}-${e.hi.toLocaleString("en-US")} input tokens (abort above ${maxBilled.toLocaleString("en-US")})`) });
+  let answers = /* @__PURE__ */ new Map(), usage2 = { billed_input_tokens: 0, output_tokens: 0, image_tokens: 0 }, clefInfo = { calls: 0, estimate: [0, 0], seconds: 0, usd: 0, model: null };
+  if (!noClef) {
+    const client = new ClefClient({ root, workers: config.workers, tag: "gate" });
+    try {
+      client.check();
+    } catch (e) {
+      throw new Error(`${e.message} Or run with --no-clef (measurement only).`);
+    }
+    const r = await askClef(client, clefGroups, { maxBilled, onEstimate: (e) => say(`${GATE_VERSION} estimate: ${clefGroups.reduce((a, g2) => a + g2.questions.length, 0)} questions, ${e.groups} images (one request each), ${e.lo.toLocaleString("en-US")}-${e.hi.toLocaleString("en-US")} input tokens (abort above ${maxBilled.toLocaleString("en-US")})`) });
     answers = r.answers;
     usage2 = r.usage;
-    sageInfo = { calls: r.calls, estimate: r.estimate, seconds: r.seconds, usd: r.usd };
-  } else say(`${GATE_VERSION}: --no-sage, measurement only`);
+    clefInfo = { calls: r.calls, estimate: r.estimate, seconds: r.seconds, usd: r.usd, model: client.model };
+  } else say(`${GATE_VERSION}: --no-clef, measurement only`);
   const what = WHAT(testW);
   const deadStatus = /* @__PURE__ */ new Map();
-  const sageErrors = [];
+  const clefErrors = [];
   for (const { gi, qid, meta } of metas) {
     const q2 = qs[qid], j = judge(q2, (answers.get(gi) || /* @__PURE__ */ new Map()).get(qid));
     if (j.status === "error" && qid !== "dead_frame") {
-      sageErrors.push({ check: qid, beat: meta.beat ?? null, frames: meta.frames, t_s: meta.t_s, error: j.note });
+      clefErrors.push({ check: qid, beat: meta.beat ?? null, frames: meta.frames, t_s: meta.t_s, error: j.note });
       continue;
     }
-    const row = { id: meta.id, check: qid, source: "sage", beat: meta.beat ?? null, frames: meta.frames, t_s: meta.t_s, severity: q2.severity, sage_answer: j.answer, sage_p: j.p, image: meta.image, crop: meta.crop };
+    const row = { id: meta.id, check: qid, source: "clef", beat: meta.beat ?? null, frames: meta.frames, t_s: meta.t_s, severity: q2.severity, clef_answer: j.answer, clef_p: j.p, image: meta.image, crop: meta.crop };
     if ("settled" in meta && !meta.settled) row.settled = false;
     const extra = meta.note ? ` (${meta.note})` : "";
     if (qid === "dead_frame") {
@@ -15709,32 +15935,32 @@ async function runGate(opts) {
       const f = meta.frames[meta.frames.length - 1];
       const hit = abruptByFrame.get(f) || [...abruptByFrame].find(([fr]) => Math.abs(fr - f) <= 1)?.[1];
       if (hit) {
-        hit.sage_answer = j.answer;
-        hit.sage_p = j.p;
-        hit.evidence += ` Sage ${qid} says '${j.answer}' (p=${j.p}).`;
+        hit.clef_answer = j.answer;
+        hit.clef_p = j.p;
+        hit.evidence += ` Clef ${qid} says '${j.answer}' (p=${j.p}).`;
         continue;
       }
     }
     if (j.status === "fail" && meta.tmax) {
-      row.evidence = `Sage answered '${j.answer}' (p=${j.p}): ${wh}${extra}. No measured one-frame spike backs it; look at the diff image.`;
+      row.evidence = `Clef answered '${j.answer}' (p=${j.p}): ${wh}${extra}. No measured one-frame spike backs it; look at the diff image.`;
       row.severity = "review";
       add(row, "escalation");
     } else if (j.status === "fail") {
-      row.evidence = `Sage answered '${j.answer}' (p=${j.p}): ${wh}${extra}.`;
+      row.evidence = `Clef answered '${j.answer}' (p=${j.p}): ${wh}${extra}.`;
       add(row, "finding");
     } else if (j.status === "escalate") {
-      row.evidence = `Sage ${j.note || "is near the line"} (answer ${j.answer}, p=${j.p}): check whether ${wh}${extra}.`;
+      row.evidence = `Clef ${j.note || "is near the line"} (answer ${j.answer}, p=${j.p}): check whether ${wh}${extra}.`;
       row.severity = qid === "hierarchy" ? "review" : q2.severity;
       add(row, "escalation");
     } else if (meta.spike_diff) {
-      row.evidence = `Measured spike: mean abs diff ${meta.spike_diff} in one frame step, far above its neighbours; Sage says '${j.answer}' (p=${j.p}). Look at the diff image.`;
+      row.evidence = `Measured spike: mean abs diff ${meta.spike_diff} in one frame step, far above its neighbours; Clef says '${j.answer}' (p=${j.p}). Look at the diff image.`;
       add(row, "escalation");
-    } else passes.push(Object.fromEntries(["id", "check", "beat", "frames", "t_s", "sage_answer", "sage_p"].map((k) => [k, row[k]])));
+    } else passes.push(Object.fromEntries(["id", "check", "beat", "frames", "t_s", "clef_answer", "clef_p"].map((k) => [k, row[k]])));
   }
   for (const d0 of M.dead) {
     const [a0, b0] = d0.frames, st = deadStatus.get(a0), meta = deadMeta.get(a0);
     const status2 = st ? st.status : "escalate", av = st ? st.answer : null, p = st ? st.p : null;
-    if (status2 === "error") sageErrors.push({ check: "dead_frame", beat: meta ? meta.beat : null, frames: [a0, b0], t_s: tS(a0), error: st.note });
+    if (status2 === "error") clefErrors.push({ check: "dead_frame", beat: meta ? meta.beat : null, frames: [a0, b0], t_s: tS(a0), error: st.note });
     const row = {
       id: `dead_frames-f${a0}-f${b0}`,
       check: "dead_frames",
@@ -15743,48 +15969,49 @@ async function runGate(opts) {
       frames: [a0, b0],
       t_s: tS(a0),
       severity: "minor",
-      sage_answer: av,
-      sage_p: p,
+      clef_answer: av,
+      clef_p: p,
       image: meta ? meta.image : null,
       crop: meta ? meta.crop : null
     };
     const baseTxt = `${d0.length} consecutive frames (${tS(a0)} s to ${tS(b0)} s) have under ${(DEAD_INK_SHARE * 100).toFixed(1)}% ink (peak ${d0.max_ink_pct}%)`;
     if (d0.tier === "escalation") {
-      row.evidence = `${baseTxt}, inside a transition window; clean renders dip for up to 13 frames, this is ${d0.length} (findings start at ${d0.limit}).` + (av !== null ? ` Sage says the mid frame is empty: '${av}'.` : "");
+      row.evidence = `${baseTxt}, inside a transition window; clean renders dip for up to 13 frames, this is ${d0.length} (findings start at ${d0.limit}).` + (av !== null ? ` Clef says the mid frame is empty: '${av}'.` : "");
       add(row, "escalation");
     } else if (status2 === "pass") {
-      row.evidence = `${baseTxt}; Sage says the mid frame is NOT empty (p=${p}), check for a deliberate hold.`;
+      row.evidence = `${baseTxt}; Clef says the mid frame is NOT empty (p=${p}), check for a deliberate hold.`;
       add(row, "escalation");
     } else {
-      row.evidence = baseTxt + (status2 === "fail" ? "; Sage confirms the mid frame is empty." : noSage ? "; Sage not run." : status2 === "error" ? "; Sage returned no answer, so the measurement stands alone." : "; Sage gave no clear answer.");
+      row.evidence = baseTxt + (status2 === "fail" ? "; Clef confirms the mid frame is empty." : noClef ? "; Clef not run." : status2 === "error" ? "; Clef returned no answer, so the measurement stands alone." : "; Clef gave no clear answer.");
       add(row, "finding");
     }
   }
   for (const lst of [findings, escalations]) lst.sort((a, b) => (SEVERITY_RANK[a.severity] ?? 2.5) - (SEVERITY_RANK[b.severity] ?? 2.5) || a.frames[0] - b.frames[0]);
   const picks = selectCriticFrames({ sched, settled: M.settled, rows: [...findings, ...escalations], beatOf, total: n, motion: topMotionFrames(d) });
-  const criticIndex = await writeCriticFrames(path17.join(outDir, "critic-frames"), video, info, picks, { root });
+  const criticIndex = await writeCriticFrames(path18.join(outDir, "critic-frames"), video, info, picks, { root });
   const seconds = Math.round((Date.now() - t0) / 100) / 10;
   const result = {
     version: GATE_VERSION,
-    video: path17.resolve(video),
-    video_sha256_12: sha12(video),
-    schedule: path17.resolve(schedPath),
-    bank: path17.resolve(bank.path),
-    bank_sha256_12: sha12(bank.path),
+    video: path18.resolve(video),
+    video_sha256_12: await fileSha12(video),
+    schedule: path18.resolve(schedPath),
+    bank: path18.resolve(bank.path),
+    bank_sha256_12: await fileSha12(bank.path),
     brand: brand ? brand.name : null,
     started,
     seconds,
     video_info: { fps, frames: n, w: FW, h: FH },
     test_width: testW,
-    sage: {
-      ran: !noSage,
-      calls: sageInfo.calls,
+    clef: {
+      ran: !noClef,
+      calls: clefInfo.calls,
       billed_input_tokens: usage2.billed_input_tokens,
       output_tokens: usage2.output_tokens,
       image_tokens: usage2.image_tokens,
-      latency_s_total: Math.round(sageInfo.seconds * 10) / 10,
-      estimate: sageInfo.estimate,
-      usd: Math.round(sageInfo.usd * 1e6) / 1e6
+      latency_s_total: Math.round(clefInfo.seconds * 10) / 10,
+      estimate: clefInfo.estimate,
+      usd: Math.round(clefInfo.usd * 1e6) / 1e6,
+      model: clefInfo.model
     },
     measure: {
       dead_runs: M.dead,
@@ -15810,18 +16037,18 @@ async function runGate(opts) {
     designed: designedRows,
     passes,
     critic_frames: criticIndex,
-    sage_asked: metas.length,
-    sage_errors: sageErrors
+    clef_asked: metas.length,
+    clef_errors: clefErrors
   };
-  fs19.writeFileSync(path17.join(outDir, "findings.json"), JSON.stringify(result, null, 1) + "\n");
-  fs19.writeFileSync(path17.join(outDir, "summary.md"), summaryText(result, outDir));
+  fs20.writeFileSync(path18.join(outDir, "findings.json"), JSON.stringify(result, null, 1) + "\n");
+  fs20.writeFileSync(path18.join(outDir, "summary.md"), summaryText(result, outDir));
   return result;
 }
 function summaryText(r, outDir) {
   const rows = [...r.findings.map((x) => ["FINDING", x]), ...r.escalations.map((x) => ["ESCALATE", x])];
   rows.sort((a, b) => (SEVERITY_RANK[a[1].severity] ?? 2.5) - (SEVERITY_RANK[b[1].severity] ?? 2.5) || (a[0] === "FINDING" ? 0 : 1) - (b[0] === "FINDING" ? 0 : 1));
   const fr = (x) => x.frames[0] === x.frames[x.frames.length - 1] ? `f${x.frames[0]}` : `f${x.frames[0]}-${x.frames[x.frames.length - 1]}`;
-  const lines = [`# ${r.version} ${path17.basename(r.video)} (${r.video_info.frames} frames, ${+r.video_info.fps.toFixed(3)} fps): ${r.findings.length} findings, ${r.escalations.length} escalations, ${r.passes.length} passes`];
+  const lines = [`# ${r.version} ${path18.basename(r.video)} (${r.video_info.frames} frames, ${+r.video_info.fps.toFixed(3)} fps): ${r.findings.length} findings, ${r.escalations.length} escalations, ${r.passes.length} passes`];
   if (outDir) lines.push(`Run folder: ${outDir}. Image paths below are relative to it.`);
   const reserved = 2 + (r.notes || []).length + (r.skipped.length ? 1 : 0) + (r.designed.length ? 1 : 0) + 1;
   const cap = Math.max(5, 30 - reserved);
@@ -15831,34 +16058,34 @@ function summaryText(r, outDir) {
   if (r.designed.length) lines.push(`Marked as designed, not defects (brand motion.designed and declared in the schedule: ${r.measure.v2.designed_effects.join(", ")}): ${r.designed.map((x) => `${x.check} ${fr(x)}`).join(", ")}.`);
   for (const n of r.notes || []) lines.push(`${n}.`);
   if (r.skipped.length) lines.push(`Not run or judged by default: ${r.skipped.join("; ")}.`);
-  if ((r.sage_errors || []).length) {
-    const n = r.sage_errors.length, asked = r.sage_asked || 0;
-    lines.push(`Sage returned no answer for ${n} of ${asked} questions. These are errors, not judgements. The measurements above stand.${n === asked ? " Sage answered none. Check the key, the endpoint and the network." : ""}`);
-    for (const e of r.sage_errors.slice(0, 5)) lines.push(`- error ${e.check} ${fr(e)} (${e.t_s} s, ${e.beat || "-"}): ${e.error}`);
+  if ((r.clef_errors || []).length) {
+    const n = r.clef_errors.length, asked = r.clef_asked || 0;
+    lines.push(`Clef returned no answer for ${n} of ${asked} questions. These are errors, not judgements. The measurements above stand.${n === asked ? " Clef answered none. Check the Cloudflare key, CLEF_MODEL and the network." : ""}`);
+    for (const e of r.clef_errors.slice(0, 5)) lines.push(`- error ${e.check} ${fr(e)} (${e.t_s} s, ${e.beat || "-"}): ${e.error}`);
   }
-  const s = r.sage;
-  lines.push(s.ran ? `Sage: ${s.billed_input_tokens.toLocaleString("en-US")} text + ${s.image_tokens.toLocaleString("en-US")} image input tokens, ${s.calls} calls, about $${s.usd.toFixed(4)}, ${s.latency_s_total.toFixed(1)} s; total ${r.seconds} s. Critic frames: ${r.critic_frames.length} in critic-frames/.` : `Sage: not run (--no-sage); total ${r.seconds} s. Critic frames: ${r.critic_frames.length} in critic-frames/.`);
+  const s = r.clef;
+  lines.push(s.ran ? `Clef (${s.model}): ${s.billed_input_tokens.toLocaleString("en-US")} text + ${s.image_tokens.toLocaleString("en-US")} image input tokens, ${s.calls} calls, about $${s.usd.toFixed(4)}, ${s.latency_s_total.toFixed(1)} s; total ${r.seconds} s. Critic frames: ${r.critic_frames.length} in critic-frames/.` : `Clef: not run (--no-clef); total ${r.seconds} s. Critic frames: ${r.critic_frames.length} in critic-frames/.`);
   return lines.join("\n") + "\n";
 }
 
 // src/commands/gate.mjs
-var help5 = "measure a rendered video, ask Sage about prepared frames, select frames for the critics";
-var USAGE2 = `usage: sagecut gate <video> [--out DIR] [--json] [--no-sage] [--no-ocr] [--schedule FILE] [--bank FILE] [--max-billed N]
+var help5 = "measure a rendered video, ask Clef about prepared frames, select frames for the critics";
+var USAGE2 = `usage: sagecut gate <video> [--out DIR] [--json] [--no-clef] [--no-ocr] [--schedule FILE] [--bank FILE] [--max-billed N]
 
   --out DIR        run folder (default sagecut/qa/gate-<stamp>)
   --json           print the result as JSON on stdout (no other output)
-  --no-sage        measurement only: no Sage call, no cost
+  --no-clef        measurement only: no Clef call, no cost
   --no-ocr         skip the OCR text checks
   --schedule FILE  schedule.json to use (default: the one in sagecut.yaml)
   --bank FILE      question bank to use (default: the bank in the plugin)
-  --max-billed N   stop before the Sage call if the estimate is above N input tokens (default 200000)`;
+  --max-billed N   stop before the Clef round if the estimate is above N input tokens (default 200000)`;
 async function run6(argv, ctx) {
   let args;
   try {
     args = parseArgs5({ args: argv, allowPositionals: true, options: {
       out: { type: "string" },
       json: { type: "boolean" },
-      "no-sage": { type: "boolean" },
+      "no-clef": { type: "boolean" },
       "no-ocr": { type: "boolean" },
       schedule: { type: "string" },
       bank: { type: "string" },
@@ -15888,39 +16115,43 @@ ${USAGE2}`);
   }
   if (v.json) setQuiet(true);
   try {
-    const video = path18.resolve(positionals[0]);
-    const outDir = v.out ? ensureDir(path18.resolve(v.out)) : newRunDir(ctx.root, "gate");
+    const video = path19.resolve(positionals[0]);
+    const outDir = v.out ? ensureDir(path19.resolve(v.out)) : newRunDir(ctx.root, "gate");
     const result = await runGate({
       video,
       root: ctx.root,
       config: ctx.config,
       outDir,
-      noSage: !!v["no-sage"],
+      noClef: !!v["no-clef"],
       noOcr: !!v["no-ocr"],
       maxBilled,
-      schedulePath: v.schedule ? path18.resolve(v.schedule) : null,
-      bankPath: v.bank ? path18.resolve(v.bank) : null
+      schedulePath: v.schedule ? path19.resolve(v.schedule) : null,
+      bankPath: v.bank ? path19.resolve(v.bank) : null
     });
-    const sageErr = (result.sage_errors || []).length, asked = result.sage_asked || 0;
-    const code = asked > 0 && sageErr === asked ? 2 : result.findings.length || result.escalations.length || sageErr ? 1 : 0;
+    const clefErr = result.clef_errors.length, asked = result.clef_asked;
+    const code = asked > 0 && clefErr === asked ? 2 : result.findings.length || result.escalations.length || clefErr ? 1 : 0;
+    if (asked > 0 && clefErr === asked) console.error(`sagecut gate: Clef returned no answer for any of the ${asked} questions (${result.clef_errors[0].error}). Check the Cloudflare key, CLEF_MODEL and the network: run "sagecut doctor". The measurements in ${outDir} stand.`);
     if (v.json) {
       process.stdout.write(JSON.stringify({
         exit: code,
         out: outDir,
         version: result.version,
         video_info: result.video_info,
-        sage: result.sage,
+        clef: result.clef,
+        clef_asked: asked,
+        clef_errors: result.clef_errors,
+        notes: result.notes,
         counts: { findings: result.findings.length, escalations: result.escalations.length, designed: result.designed.length, passes: result.passes.length },
         findings: result.findings,
         escalations: result.escalations,
         designed: result.designed,
         skipped: result.skipped,
-        critic_frames: result.critic_frames.map((c) => ({ ...c, file: path18.join(outDir, "critic-frames", c.file) }))
+        critic_frames: result.critic_frames.map((c) => ({ ...c, file: path19.join(outDir, "critic-frames", c.file) }))
       }, null, 1) + "\n");
     } else {
-      say(fs20.readFileSync(path18.join(outDir, "summary.md"), "utf8").trimEnd());
+      say(fs21.readFileSync(path19.join(outDir, "summary.md"), "utf8").trimEnd());
       say(`
-Results: ${path18.join(outDir, "findings.json")}`);
+Results: ${path19.join(outDir, "findings.json")}`);
     }
     return code;
   } catch (e) {
@@ -15943,15 +16174,15 @@ import path21 from "node:path";
 import { parseArgs as parseArgs6 } from "node:util";
 
 // src/sweep/bank.mjs
-import fs21 from "node:fs";
-import path19 from "node:path";
+import fs22 from "node:fs";
+import path20 from "node:path";
 function loadBank2(config) {
-  const base = JSON.parse(fs21.readFileSync(path19.join(pluginRoot(), "assets", "bank", "sweep-default.json"), "utf8"));
+  const base = JSON.parse(fs22.readFileSync(path20.join(pluginRoot(), "assets", "bank", "sweep-default.json"), "utf8"));
   if (!config || !config.question_bank) return base;
-  const file = path19.resolve(config.root || process.cwd(), config.question_bank);
+  const file = path20.resolve(config.root || process.cwd(), config.question_bank);
   let mine;
   try {
-    mine = JSON.parse(fs21.readFileSync(file, "utf8"));
+    mine = JSON.parse(fs22.readFileSync(file, "utf8"));
   } catch (e) {
     throw new Error(`question bank ${file}: ${e.message}`);
   }
@@ -16035,17 +16266,27 @@ function makeExplainer(schedule, { tolerance = 15, frames: frames2 = null, desig
       }
     }
   }
-  const trans = schedule ? schedule.transitions.map((t) => t.frames) : [];
+  const trans = schedule ? (schedule.transitions || []).map((t) => t.frames) : [];
+  const effects = schedule ? (schedule.effects || []).filter((e) => e && designed.has(e.kind) && Array.isArray(e.frames)).map((e) => e.frames) : [];
   const cuts = schedule ? [...schedule.cuts, ...(schedule.interim_cuts || []).map((c) => typeof c === "number" ? c : c.frame).filter((x) => x != null)] : [];
   return function why(f, q2) {
     if (q2 === "legible" && schedule && !onscreen.has(f)) return "no type on screen";
     if (moving.has(f) || edges.some((x) => Math.abs(f - x) <= tolerance)) return "element enter/exit";
-    if (trans.some(([a, b]) => f >= a && f <= b)) return "transition";
+    if (trans.some(([a, b]) => f >= a - tolerance && f <= b + tolerance)) return "transition";
     if (cuts.some((c) => Math.abs(f - c) <= 2)) return "cut";
     if (frames2 != null && (f <= 1 || f >= frames2 - 2)) return "frame edge (first or last frames)";
-    if (q2 === "glitch" && designed.has("glitch")) return "designed effect (brand)";
+    if (q2 === "glitch" && effects.some(([a, b]) => f >= a && f <= b)) return "designed effect (schedule effects)";
     return null;
   };
+}
+function frameStatus(rows, frames2) {
+  const bad = /* @__PURE__ */ new Set(), seen = /* @__PURE__ */ new Set();
+  for (const r of rows) {
+    seen.add(r.f);
+    if (r.error) bad.add(r.f);
+  }
+  const read = new Set(frames2.filter((f) => seen.has(f) && !bad.has(f)));
+  return { read, failed: frames2.filter((f) => !read.has(f)).sort((a, b) => a - b) };
 }
 function splitFlags(flags, why, gap) {
   const explained = {};
@@ -16067,30 +16308,7 @@ function splitFlags(flags, why, gap) {
 var CONTROL_PMIN = 0.7;
 var CTL_POS = "__control_pos";
 var CTL_NEG = "__control_neg";
-var addUsage = (a, b) => ({
-  billed_input_tokens: (a.billed_input_tokens || 0) + (b.billed_input_tokens || 0),
-  output_tokens: (a.output_tokens || 0) + (b.output_tokens || 0),
-  image_tokens: (a.image_tokens || 0) + (b.image_tokens || 0),
-  calls: (a.calls || 0) + (b.calls || 0)
-});
 var zeroUsage = () => ({ billed_input_tokens: 0, output_tokens: 0, image_tokens: 0, calls: 0 });
-var fatal = (e) => /rejected the key|No Sage key/.test(e.message || "");
-async function safeDecide(client, groups, opts = {}) {
-  try {
-    return await client.decide(groups, opts);
-  } catch (e) {
-    if (fatal(e)) throw e;
-    if (groups.length > 1) {
-      const h = Math.ceil(groups.length / 2);
-      const [a, b] = [await safeDecide(client, groups.slice(0, h), opts), await safeDecide(client, groups.slice(h), opts)];
-      return { rows: [...a.rows, ...b.rows], usage: addUsage(a.usage, b.usage), usd: a.usd + b.usd, seconds: a.seconds + b.seconds };
-    }
-    const g = groups[0];
-    const answers = {};
-    for (const q2 of g.questions) answers[q2.id] = { answer: null, p: null, null: true, error: `batch failed: ${String(e.message).slice(0, 160)}` };
-    return { rows: [{ id: g.id, label: g.label || String(g.id), answers }], usage: zeroUsage(), usd: 0, seconds: 0 };
-  }
-}
 async function pool(list, n, fn) {
   const out = new Array(list.length);
   let next = 0;
@@ -16103,61 +16321,56 @@ async function pool(list, n, fn) {
   }));
   return out;
 }
+function poolSettled(list, n, fn) {
+  return pool(list, n, async (x, i) => {
+    try {
+      return { ok: true, value: await fn(x, i) };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+}
 function judgeControl(pos, neg, bad, pmin) {
   const posOk = !!pos && isProblem(pos.answer, pos.p, bad, CONTROL_PMIN);
   const negFlag = !!neg && isProblem(neg.answer, neg.p, bad, pmin);
   const ok = posOk;
-  const reason = !pos ? "no control answer" : posOk ? negFlag ? "control found, but the question also flags the clean frame" : "control found" : pos.answer == null ? "Sage was unsure on the control" : `Sage did not find the defect in the control (${pos.answer}, p=${pos.p})`;
+  const reason = !pos ? "no control answer" : posOk ? negFlag ? "control found, but the question also flags the clean frame" : "control found" : pos.answer == null ? "Clef was unsure on the control" : `Clef did not find the defect in the control (${pos.answer}, p=${pos.p})`;
   return { ok, clean_frame_flagged: negFlag, reason };
 }
-async function runControlled(client, { items, variants, control, bad = "yes", pmin = 0.8, slice = 18, what = "ask" }) {
+async function runControlled(client, { items, variants, control, bad = "yes", pmin = 0.8, what = "ask" }) {
   const questions = variants.map((v) => ({ id: v.id, kind: "yesno", instructions: v.instructions }));
-  const slices = [];
-  for (let i = 0; i < items.length; i += slice) slices.push(items.slice(i, i + slice));
-  if (!slices.length && control) slices.push([]);
-  const results = await pool(slices, client.workers, async (part) => {
-    const groups = [];
-    if (control) {
-      groups.push({ id: CTL_POS, label: `control:${control.kind}`, content: { kind: "image", media: control.pos }, questions });
-      if (control.neg) groups.push({ id: CTL_NEG, label: "clean frame", content: { kind: "image", media: control.neg }, questions });
-    }
-    for (const it of part) groups.push({ id: it.id, label: it.label, content: { kind: "image", media: it.media }, questions });
-    return safeDecide(client, groups, { what });
-  });
-  let usage2 = zeroUsage();
-  let usd = 0;
-  let seconds = 0;
-  const rows = [];
-  const controls = {};
+  const groups = [];
+  if (control) {
+    groups.push({ id: CTL_POS, label: `control:${control.kind}`, content: { kind: "image", media: control.pos }, questions });
+    if (control.neg) groups.push({ id: CTL_NEG, label: "clean frame", content: { kind: "image", media: control.neg }, questions });
+  }
+  for (const it of items) groups.push({ id: it.id, label: it.label, content: { kind: "image", media: it.media }, questions });
+  const r = await client.decide(groups, { what });
+  const rows = [], controls = {};
   for (const v of variants) controls[v.id] = control ? { ok: true, kind: control.kind, pos: null, neg: null, clean_frame_flagged: false, reason: "control found" } : { ok: false, kind: null, pos: null, neg: null, clean_frame_flagged: false, reason: "no control could be made for this question" };
-  for (const r of results) {
-    usage2 = addUsage(usage2, r.usage);
-    usd += r.usd;
-    seconds = Math.max(seconds, r.seconds);
-    for (const row of r.rows) {
-      if (row.id === CTL_POS || row.id === CTL_NEG) {
-        for (const v of variants) {
-          const c = controls[v.id];
-          const a = row.answers[v.id];
-          if (row.id === CTL_POS) {
-            const j = judgeControl(a, null, bad, pmin);
-            if (c.pos === null || !j.ok) {
-              c.pos = a;
-              c.ok = c.ok && j.ok;
-              if (!j.ok) c.reason = j.reason;
-            }
-          } else {
-            c.neg = a;
-            if (isProblem(a.answer, a.p, bad, pmin)) {
-              c.clean_frame_flagged = true;
-              if (c.ok) c.reason = "control found, but the question also flags the clean frame";
-            }
+  for (const row of r.rows) {
+    if (row.id === CTL_POS || row.id === CTL_NEG) {
+      for (const v of variants) {
+        const c = controls[v.id];
+        const a = row.answers[v.id];
+        if (row.id === CTL_POS) {
+          const j = judgeControl(a, null, bad, pmin);
+          if (c.pos === null || !j.ok) {
+            c.pos = a;
+            c.ok = c.ok && j.ok;
+            if (!j.ok) c.reason = j.reason;
+          }
+        } else {
+          c.neg = a;
+          if (isProblem(a.answer, a.p, bad, pmin)) {
+            c.clean_frame_flagged = true;
+            if (c.ok) c.reason = "control found, but the question also flags the clean frame";
           }
         }
-      } else rows.push(row);
-    }
+      }
+    } else rows.push(row);
   }
-  return { rows, controls, usage: usage2, usd, seconds };
+  return { rows, controls, usage: r.usage, usd: r.usd, seconds: r.seconds };
 }
 function runVerdict(answers, controls, bad, pmin) {
   let n = 0;
@@ -16179,18 +16392,18 @@ function runVerdict(answers, controls, bad, pmin) {
     else voided++;
   }
   const base = { n, problems: pc, voided, weak };
-  if (n === 0) return { label: "to-measure", detail: voided ? 'the control failed, so the "no" answers prove nothing' : "Sage gave no usable answer", ...base };
+  if (n === 0) return { label: "to-measure", detail: voided ? 'the control failed, so the "no" answers prove nothing' : "Clef gave no usable answer", ...base };
   if (pc >= 1 && pc * 2 >= n) return { label: "confirmed", detail: `${pc} of ${n} answers flag it`, ...base };
-  if (pc === 0 && n >= 2 && weak === 0) return { label: "cleared-by-sage", detail: `${n} answers say no, control ok`, ...base };
+  if (pc === 0 && n >= 2 && weak === 0) return { label: "cleared-by-clef", detail: `${n} answers say no, control ok`, ...base };
   return { label: "to-measure", detail: pc === 0 ? weak ? 'a weak "yes" remains' : 'only one valid "no" answer' : `${pc} of ${n} answers flag it (mixed)`, ...base };
 }
 
 // src/sweep/common.mjs
-import fs22 from "node:fs";
+import fs23 from "node:fs";
 function loadContext(config) {
   let schedule = null;
   let brand = null;
-  if (fs22.existsSync(config.schedulePath)) {
+  if (fs23.existsSync(config.schedulePath)) {
     try {
       schedule = loadSchedule(config.schedulePath);
     } catch (e) {
@@ -16207,142 +16420,18 @@ function loadContext(config) {
 }
 var num2 = (v, d) => v === void 0 || v === null || v === "" || !Number.isFinite(Number(v)) ? d : Number(v);
 function parseRange(s, frames2) {
+  if (!Number.isFinite(frames2) || frames2 < 1) throw new Error("the video has no frame count (ffprobe could not read it)");
   if (!s) return [0, frames2 - 1];
   const m = /^(\d+)-(\d+)$/.exec(String(s));
   if (!m) throw new Error(`--range must look like 0-599 (got "${s}")`);
-  return [Number(m[1]), Math.min(Number(m[2]), frames2 - 1)];
-}
-
-// src/sweep/images.mjs
-import fs23 from "node:fs";
-import path20 from "node:path";
-import crypto2 from "node:crypto";
-import zlib2 from "node:zlib";
-var escapeRe = (s) => s.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-function segmentRe(seg) {
-  let out = "";
-  for (const ch of seg) out += ch === "*" ? "[^/\\\\]*" : ch === "?" ? "[^/\\\\]" : escapeRe(ch);
-  return new RegExp(`^${out}$`);
-}
-function expandGlob(pattern, cwd = process.cwd()) {
-  const norm = pattern.replace(/\\/g, "/");
-  const abs2 = path20.isAbsolute(pattern) || /^[a-zA-Z]:\//.test(norm);
-  const parts = norm.split("/").filter((p, i) => p !== "" || i === 0);
-  let bases = [abs2 ? norm.startsWith("/") ? "/" : parts.shift() + "/" : cwd];
-  if (abs2 && norm.startsWith("/")) parts.shift();
-  const out = [];
-  const walk2 = (dir, i) => {
-    if (i === parts.length) {
-      out.push(dir);
-      return;
-    }
-    const seg = parts[i];
-    if (seg === "**") {
-      walk2(dir, i + 1);
-      for (const d of safeDirs(dir)) walk2(path20.join(dir, d), i);
-      return;
-    }
-    if (!/[*?]/.test(seg)) {
-      const next = path20.join(dir, seg);
-      if (fs23.existsSync(next)) walk2(next, i + 1);
-      return;
-    }
-    const re = segmentRe(seg);
-    let names = [];
-    try {
-      names = fs23.readdirSync(dir);
-    } catch {
-      return;
-    }
-    for (const n of names.sort()) if (re.test(n)) walk2(path20.join(dir, n), i + 1);
-  };
-  for (const b of bases) walk2(b, 0);
-  return [...new Set(out)].sort().filter((p) => {
-    try {
-      return fs23.statSync(p).isFile();
-    } catch {
-      return false;
-    }
-  });
-}
-function safeDirs(dir) {
-  try {
-    return fs23.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith(".") && d.name !== "node_modules").map((d) => d.name);
-  } catch {
-    return [];
-  }
-}
-function decodePng(buf) {
-  if (buf.readUInt32BE(0) !== 2303741511) throw new Error("not a PNG");
-  let pos = 8;
-  let w = 0;
-  let h = 0;
-  let ct = 0;
-  const idat = [];
-  while (pos < buf.length) {
-    const len = buf.readUInt32BE(pos);
-    const type = buf.toString("ascii", pos + 4, pos + 8);
-    const data = buf.subarray(pos + 8, pos + 8 + len);
-    if (type === "IHDR") {
-      w = data.readUInt32BE(0);
-      h = data.readUInt32BE(4);
-      ct = data[9];
-      if (data[8] !== 8 || data[12] !== 0) throw new Error("only 8-bit non-interlaced PNG is supported");
-    } else if (type === "IDAT") idat.push(data);
-    else if (type === "IEND") break;
-    pos += 12 + len;
-  }
-  const ch = { 0: 1, 2: 3, 6: 4 }[ct];
-  if (!ch) throw new Error(`unsupported PNG colour type ${ct}`);
-  const raw = zlib2.inflateSync(Buffer.concat(idat));
-  const stride = w * ch;
-  const px = Buffer.alloc(h * stride);
-  for (let y = 0; y < h; y++) {
-    const f = raw[y * (stride + 1)];
-    const src = y * (stride + 1) + 1;
-    const dst = y * stride;
-    for (let x = 0; x < stride; x++) {
-      const a = x >= ch ? px[dst + x - ch] : 0;
-      const b = y > 0 ? px[dst - stride + x] : 0;
-      const c = x >= ch && y > 0 ? px[dst - stride + x - ch] : 0;
-      let v = raw[src + x];
-      if (f === 1) v += a;
-      else if (f === 2) v += b;
-      else if (f === 3) v += a + b >> 1;
-      else if (f === 4) {
-        const pa = Math.abs(b - c);
-        const pb = Math.abs(a - c);
-        const pc = Math.abs(a + b - 2 * c);
-        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-      }
-      px[dst + x] = v & 255;
-    }
-  }
-  if (ch === 3) return { rgb: px, w, h };
-  const rgb = Buffer.alloc(w * h * 3);
-  for (let i = 0; i < w * h; i++) for (let k = 0; k < 3; k++) rgb[i * 3 + k] = ch === 1 ? px[i] : px[i * 4 + k];
-  return { rgb, w, h };
-}
-async function decodeFrame(video, frame, { root, width, fps }) {
-  return decodePng(await still(video, frame, { root, fps: fps || 1, width }));
-}
-async function decodeImageFile(file, { root, width }) {
-  const info = await probe(file, { root });
-  const w = Math.min(width, info.width);
-  const r = await run("ffmpeg", ["-v", "error", "-i", file, "-frames:v", "1", "-vf", `scale=${w}:-2:flags=lanczos,format=rgb24`, "-f", "image2pipe", "-c:v", "png", "pipe:1"], { root });
-  if (r.code !== 0 || !r.stdout.length) throw new Error(`could not read image ${file}: ${r.stderr.trim().slice(0, 200)}`);
-  return decodePng(r.stdout);
-}
-var pngUri = ({ rgb, w, h }) => `data:image/png;base64,${encodePng(rgb, w, h, 3).toString("base64")}`;
-function fileSha12(file) {
-  return new Promise((resolve, reject) => {
-    const h = crypto2.createHash("sha256");
-    fs23.createReadStream(file).on("data", (d) => h.update(d)).on("end", () => resolve(h.digest("hex").slice(0, 12))).on("error", reject);
-  });
+  const a = Number(m[1]), b = Math.min(Number(m[2]), frames2 - 1);
+  if (a >= frames2) throw new Error(`--range ${s} starts past the end of the video (${frames2} frames, last frame ${frames2 - 1})`);
+  if (a > b) throw new Error(`--range ${s} is empty: the first frame is after the last`);
+  return [a, b];
 }
 
 // src/commands/sweep.mjs
-var help6 = "Sage reads every frame of a video (problem questions; legibility inside text windows).";
+var help6 = "Clef reads every frame of a video (problem questions; legibility inside text windows).";
 var BIG_WIDTH = 960;
 async function run7(argv, { root, config }) {
   const { values, positionals } = parseArgs6({ args: argv, allowPositionals: true, options: {
@@ -16356,9 +16445,10 @@ async function run7(argv, { root, config }) {
     help: { type: "boolean", short: "h" }
   } });
   if (values.help || !positionals.length) {
-    console.log("usage: sagecut sweep <video> [--out DIR] [--workers N] [--step N] [--range A-B] [--pmin P] [--json]\n\nSage reads every frame at 960 px with the problem questions. Inside text windows it also asks the legibility question\nat the test width. Writes sweep.json and summary.md in the output folder.");
+    console.log("usage: sagecut sweep <video> [--out DIR] [--workers N] [--step N] [--range A-B] [--pmin P] [--json]\n\nClef reads every frame at 960 px with the problem questions. Inside text windows it also asks the legibility question\nat the test width. Writes sweep.json and summary.md in the output folder.");
     return values.help ? 0 : 2;
   }
+  if (values.pmin !== void 0 && !(Number(values.pmin) > 0 && Number(values.pmin) <= 1)) throw new Error(`--pmin is a probability between 0 and 1 (got "${values.pmin}")`);
   if (values.json) setQuiet(true);
   const video = path21.resolve(positionals[0]);
   if (!fs24.existsSync(video)) throw new Error(`video not found: ${video}`);
@@ -16370,8 +16460,8 @@ async function run7(argv, { root, config }) {
   const workers = Math.max(1, Math.round(num2(values.workers, config.workers || 4)));
   const [f0, f1] = parseRange(values.range, info.frames);
   const typed = typedFrames(ctx.schedule);
-  const client = new SageClient({ root, workers, plan: config.plan, tag: "sweep" });
-  client.headers();
+  const client = new ClefClient({ root, workers, tag: "sweep" });
+  client.check();
   const out = ensureDir(values.out ? path21.resolve(values.out) : newRunDir(root, "sweep"));
   const list = [];
   for (let f = f0; f <= f1; f += step) list.push(f);
@@ -16379,14 +16469,18 @@ async function run7(argv, { root, config }) {
   const batches = [];
   for (let i = 0; i < list.length; i += batchFrames) batches.push(list.slice(i, i + batchFrames));
   const jpg = (f, width) => still(video, f, { root, fps: info.fps, width, format: "jpg" });
+  const lost = [];
   const prepare2 = async (frames2) => {
     const groups = [];
-    const made = await pool(frames2, workers * 2, async (f) => {
+    const made = await poolSettled(frames2, workers * 2, async (f) => {
       const big = await jpg(f, BIG_WIDTH);
       const feed = typed.has(f) ? await jpg(f, ctx.testWidth) : null;
       return { f, big, feed };
     });
-    for (const { f, big, feed } of made) {
+    made.forEach((m, i) => {
+      if (!m.ok) lost.push({ f: frames2[i], error: `frame not extracted: ${m.error}` });
+    });
+    for (const { f, big, feed } of made.filter((m) => m.ok).map((m) => m.value)) {
       groups.push({
         id: `${f}|big`,
         label: String(f),
@@ -16413,7 +16507,9 @@ async function run7(argv, { root, config }) {
   for (let b = 0; b < batches.length; b++) {
     const groups = await pending;
     pending = b + 1 < batches.length ? prepare2(batches[b + 1]) : null;
-    const r = await safeDecide(client, groups, { what: "sweep" });
+    pending?.catch(() => {
+    });
+    const r = await client.decide(groups, { what: "sweep" });
     requests += groups.length;
     const fOf = new Map(groups.map((g) => [g.id, g.f]));
     for (const row of r.rows) {
@@ -16429,8 +16525,8 @@ async function run7(argv, { root, config }) {
     say(`sweep: ${Math.min(list.length, (b + 1) * batchFrames)}/${list.length} frames`);
   }
   const seconds = (Date.now() - t0) / 1e3;
-  const withAnswer = new Set(rows.filter((r) => !r.error).map((r) => r.f));
-  const failed = [...new Set(rows.filter((r) => r.error).map((r) => r.f))].filter((f) => !withAnswer.has(f)).sort((a, b) => a - b);
+  for (const { f, error } of lost) rows.push({ f, q: "*", answer: null, p: null, error });
+  const { read: withAnswer, failed } = frameStatus(rows, list);
   const errors = rows.filter((r) => r.error).length;
   const nulls = rows.filter((r) => r.answer == null && !r.error).length;
   const flags = flagRows(rows, pmin);
@@ -16450,7 +16546,7 @@ async function run7(argv, { root, config }) {
     failed_frames: failed,
     usage: usage2,
     usd: Number(usd.toFixed(6)),
-    plan: config.plan,
+    model: client.model,
     seconds: Number(seconds.toFixed(1)),
     workers,
     pmin,
@@ -16472,15 +16568,15 @@ async function run7(argv, { root, config }) {
     say(`written: ${path21.relative(root, out) || out}`);
   }
   if (failed.length) {
-    warn(`sagecut: ${failed.length} frames were NOT read (Sage errors after retries). Run them again with --range, then use frames_read.`);
+    warn(`sagecut: ${failed.length} frames were NOT read (Clef errors after retries). Run them again with --range, then use frames_read.`);
     return 2;
   }
   return runs2.length ? 1 : 0;
 }
 function summary2(r, runs2, bank) {
   const L = [];
-  L.push(`# Sage sweep, frames ${r.range[0]}-${r.range[1]} (step ${r.step})`, "");
-  L.push(`${r.frames_read} frames read by Sage, ${r.requests} image requests, ${r.answers} answers (${r.nulls} unsure), ${r.usage.billed_input_tokens.toLocaleString("en-US")} text + ${(r.usage.image_tokens || 0).toLocaleString("en-US")} image input tokens, $${r.usd.toFixed(6)} (plan ${r.plan}), ${Math.round(r.seconds)} s. A flag needs the problem answer with p >= ${r.pmin}. Legibility is asked at ${r.test_width} px${r.schedule_used ? ` on ${r.typed_frames} frames with text` : " (no schedule: not asked)"}.`, "");
+  L.push(`# Clef sweep, frames ${r.range[0]}-${r.range[1]} (step ${r.step})`, "");
+  L.push(`${r.frames_read} frames read by Clef, ${r.requests} image requests, ${r.answers} answers (${r.nulls} unsure), ${r.usage.billed_input_tokens.toLocaleString("en-US")} text + ${(r.usage.image_tokens || 0).toLocaleString("en-US")} image input tokens, $${r.usd.toFixed(6)} (model ${r.model}), ${Math.round(r.seconds)} s. A flag needs the problem answer with p >= ${r.pmin}. Legibility is asked at ${r.test_width} px${r.schedule_used ? ` on ${r.typed_frames} frames with text` : " (no schedule: not asked)"}.`, "");
   if (r.errors) L.push(`**${r.errors} answers failed after retries; ${r.failed_frames.length} frames NOT read** (first: ${r.failed_frames.slice(0, 10).join(", ") || "none"}). Run those again with --range before you use frames_read.`, "");
   for (const q2 of [...Object.keys(bank.problems), "legible"]) L.push(`- ${q2}: ${r.flagged[q2] || 0} frames flagged`);
   L.push("", "## Runs (question, first-last frame, frames flagged)");
@@ -16637,6 +16733,7 @@ function makeOffbrand(f, palette) {
 }
 var CONTROL_KINDS = ["cut", "black", "frozen", "ghost", "offbrand"];
 function makeControl(kind, frame, { palette = [] } = {}) {
+  if (kind == null || kind === "none") return null;
   switch (kind) {
     case "black":
       return makeBlack(frame);
@@ -16700,7 +16797,8 @@ var toGray = ({ rgb, w, h }) => {
   return g;
 };
 async function popRatio(video, { root, fps, total, run: run16 }) {
-  const list = run16.list.length > 100 ? [run16.ask_frame] : run16.list;
+  if (run16.list.length > 100) return { ratio: null, pop: null, frame: null, reason: `the run is too long (${run16.list.length} flagged frames) for the one-frame pop measure` };
+  const list = run16.list;
   const lo = Math.max(0, Math.min(...list) - 17);
   const hi = Math.min(total - 1, Math.max(...list) + 17);
   const nums = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
@@ -16720,7 +16818,7 @@ async function popRatio(video, { root, fps, total, run: run16 }) {
 }
 
 // src/commands/triage.mjs
-var help7 = "Explain sweep flags by the schedule, then ask Sage about the rest, each question with a control.";
+var help7 = "Explain sweep flags by the schedule, then ask Clef about the rest, each question with a control.";
 var POP_CONFIRM = 3;
 function sampleFrames(run16) {
   const l = run16.list;
@@ -16747,7 +16845,7 @@ async function run8(argv, { root, config }) {
     help: { type: "boolean", short: "h" }
   } });
   if (values.help || !positionals.length) {
-    console.log("usage: sagecut triage <sweep-run-dir> [--video FILE] [--edge N] [--json]\n\nExplains sweep flags by the schedule (tolerance --edge frames, default 15), then asks Sage about the residual runs.\nEach question has a synthetic control from your own frames. Writes triage.json and triage.md in the run folder.");
+    console.log("usage: sagecut triage <sweep-run-dir> [--video FILE] [--edge N] [--json]\n\nExplains sweep flags by the schedule (tolerance --edge frames, default 15), then asks Clef about the residual runs.\nEach question has a synthetic control from your own frames. Writes triage.json and triage.md in the run folder.");
     return values.help ? 0 : 2;
   }
   if (values.json) setQuiet(true);
@@ -16758,6 +16856,8 @@ async function run8(argv, { root, config }) {
   const sw = readJson(sweepFile);
   const video = path22.resolve(values.video || sw.video);
   if (!fs25.existsSync(video)) throw new Error(`video not found: ${video}. Pass --video FILE.`);
+  const sha = await fileSha12(video);
+  if (sw.video_sha256_12 && sha !== sw.video_sha256_12) throw new Error(`${video} is not the video the sweep read (sha ${sha}, the sweep read ${sw.video_sha256_12}). Sweep this video first, or pass the swept file with --video.`);
   const info = await probe(video, { root });
   const ctx = loadContext(config);
   const bank = loadBank2(config);
@@ -16772,6 +16872,7 @@ async function run8(argv, { root, config }) {
   say(`flagged ${[...flaggedAll].length} frames; explained ${Object.values(explained).reduce((a, b) => a + b, 0)} frame-answers ${JSON.stringify(explained)}; residual runs ${residual.length}`);
   let usage2 = zeroUsage();
   let usd = 0;
+  let model = null;
   const controls = {};
   const byQ = {};
   for (const r of residual) (byQ[r.q] = byQ[r.q] || []).push(r);
@@ -16783,7 +16884,7 @@ async function run8(argv, { root, config }) {
         r.measure = m;
         if (m.ratio == null) {
           r.label = "to-measure";
-          r.detail = "too few frames around the run to measure";
+          r.detail = m.reason || "too few frames around the run to measure";
         } else if (m.ratio >= POP_CONFIRM) {
           r.label = "confirmed";
           r.detail = `one-frame pop ${m.pop} is ${m.ratio}x the local median (f${m.frame})`;
@@ -16806,8 +16907,9 @@ async function run8(argv, { root, config }) {
     const width = tq.width === "test" ? ctx.testWidth : Number(tq.width) || 960;
     const bad = tq.bad || badAnswer(q2);
     const variants = tq.questions.map((t, i) => ({ id: `v${i}`, instructions: t }));
-    const client = new SageClient({ root, workers: config.workers || 4, plan: config.plan, tag: "triage" });
-    client.headers();
+    const client = new ClefClient({ root, workers: config.workers || 4, tag: "triage" });
+    client.check();
+    model = client.model;
     let control = null;
     const cf = await pickControlFrame({ video, info, root, typed: typedFrames(ctx.schedule), flagged: flaggedAll });
     if (cf !== null) {
@@ -16840,18 +16942,19 @@ async function run8(argv, { root, config }) {
         }
       }
       const v = runVerdict(answers, res.controls, bad, pmin);
-      r.check = "sage";
+      r.check = "clef";
       r.label = v.label;
       r.detail = v.detail;
       r.votes = { n: v.n, problems: v.problems, voided: v.voided, weak: v.weak };
       r.answers = answers.map(({ frame, variantId, answer, p }) => ({ frame, variant: variantId, answer, p }));
     }
   }
-  const counts = { "cleared-by-measurement": 0, "cleared-by-sage": 0, confirmed: 0, "to-measure": 0 };
+  const counts = { "cleared-by-measurement": 0, "cleared-by-clef": 0, confirmed: 0, "to-measure": 0 };
   for (const r of residual) counts[r.label]++;
   const out = {
     sweep: path22.basename(dir),
     video,
+    video_sha256_12: sha,
     pmin,
     edge,
     flagged: sw.flagged || Object.fromEntries(Object.entries(flags).map(([q2, v]) => [q2, v.length])),
@@ -16873,7 +16976,7 @@ async function run8(argv, { root, config }) {
     controls,
     usage: usage2,
     usd: Number(usd.toFixed(6)),
-    plan: config.plan,
+    model,
     seconds: Number(((Date.now() - t0) / 1e3).toFixed(1))
   };
   writeJson(path22.join(dir, "triage.json"), out);
@@ -16901,8 +17004,8 @@ function markdown(o) {
     }
     L.push("");
   }
-  L.push(`Sage cost $${o.usd.toFixed(6)}, ${o.usage.billed_input_tokens} text + ${o.usage.image_tokens || 0} image input tokens, ${o.seconds} s.`);
-  L.push('"confirmed" means a repeated flag: measure it next. A Sage answer alone is never proof.');
+  L.push(`Clef cost $${o.usd.toFixed(6)}, ${o.usage.billed_input_tokens} text + ${o.usage.image_tokens || 0} image input tokens, ${o.seconds} s.`);
+  L.push('"confirmed" means a repeated flag: measure it next. A Clef answer alone is never proof.');
   return L.join("\n") + "\n";
 }
 
@@ -16915,7 +17018,7 @@ __export(ask_exports, {
 import fs26 from "node:fs";
 import path23 from "node:path";
 import { parseArgs as parseArgs8 } from "node:util";
-var help8 = "Ask Sage one yes/no question about some images, with an automatic control.";
+var help8 = "Ask Clef one yes/no question about some images, with an automatic control.";
 async function run9(argv, { root, config }) {
   const { values, positionals } = parseArgs8({ args: argv, allowPositionals: true, options: {
     root: { type: "string" },
@@ -16929,7 +17032,7 @@ async function run9(argv, { root, config }) {
     help: { type: "boolean", short: "h" }
   } });
   if (values.help || !(values.images || positionals.length) || !values.question) {
-    console.log('usage: sagecut ask --images <glob> --question "<text>" [--width N] [--control cut|black|frozen|ghost|offbrand|none]\n                   [--control-expect yes|no] [--out FILE] [--json]\n\nAsks Sage one yes/no question on each image (scaled to --width, default the test width). A control made from your first\nimage runs in the same batch. If Sage misses the defect in the control, the run is unreliable: its "no" answers prove nothing.\nWithout --control, the control is chosen from the question words; --control none turns it off.');
+    console.log('usage: sagecut ask --images <glob> --question "<text>" [--width N] [--control cut|black|frozen|ghost|offbrand|none]\n                   [--control-expect yes|no] [--out FILE] [--json]\n\nAsks Clef one yes/no question on each image (scaled to --width, default the test width). A control made from your first\nimage is asked with them. If Clef misses the defect in the control, the run is unreliable: its "no" answers prove nothing.\nWithout --control, the control is chosen from the question words; --control none turns it off.');
     return values.help ? 0 : 2;
   }
   if (values.json) setQuiet(true);
@@ -16947,8 +17050,8 @@ async function run9(argv, { root, config }) {
     files.push(...hit);
   }
   const unique = [...new Set(files)];
-  const client = new SageClient({ root, workers: config.workers || 4, plan: config.plan, tag: "ask" });
-  client.headers();
+  const client = new ClefClient({ root, workers: config.workers || 4, tag: "ask" });
+  client.check();
   const frames2 = [];
   for (const f of unique) frames2.push(await decodeImageFile(f, { root, width }));
   const items = unique.map((f, i) => ({ id: f, label: path23.basename(f), media: pngUri(frames2[i]) }));
@@ -16963,13 +17066,17 @@ async function run9(argv, { root, config }) {
   const c = res.controls.q;
   const verified = !!control;
   const unreliable = verified ? !c.ok : false;
+  const polarityHint = control && !values.control && !values["control-expect"] && !c.ok && c.pos && c.pos.answer === "no" ? `the control was picked from the question words and expects "yes" for the defect; if "no" means the defect in your question, run again with --control-expect no` : null;
   const rows = res.rows.map((r) => ({ id: r.id, label: r.label, answer: r.answers.q.answer, p: r.answers.q.p, null: r.answers.q.answer == null, error: r.answers.q.error || null }));
+  const errors = rows.filter((r) => r.error).length + (control && c.pos && c.pos.error ? 1 : 0);
   const out = {
     question: values.question,
     width,
     control: control ? { kind: control.kind, expect, ok: c.ok, reason: c.reason, answer: c.pos && c.pos.answer, p: c.pos && c.pos.p } : { kind: "none", note: controlNote },
     unreliable,
+    ...polarityHint ? { hint: polarityHint } : {},
     count: rows.length,
+    errors,
     usage: res.usage,
     usd: Number(res.usd.toFixed(6)),
     seconds: Number(res.seconds.toFixed(1)),
@@ -16981,11 +17088,13 @@ async function run9(argv, { root, config }) {
     const w = Math.max(...rows.map((r) => r.label.length), 5);
     for (const r of rows) say(`${r.label.padEnd(w)}  ${(r.answer || "null").padEnd(4)}  p=${r.p != null ? r.p.toFixed(3) : "-"}${r.error ? `  error: ${r.error}` : ""}`);
     say("");
-    if (control) say(`control (${control.kind}, expected ${expect}): ${c.ok ? "OK" : "FAILED"}, ${c.reason}${unreliable ? '\nUNRELIABLE: Sage missed the defect in the control, so its "no" answers above prove nothing. Measure instead.' : ""}`);
+    if (control) say(`control (${control.kind}, expected ${expect}): ${c.ok ? "OK" : "FAILED"}, ${c.reason}${unreliable ? '\nUNRELIABLE: Clef missed the defect in the control, so its "no" answers above prove nothing. Measure instead.' : ""}`);
     else say(`control: none${controlNote ? ` (${controlNote})` : ""}`);
+    if (polarityHint) say(`hint: ${polarityHint}`);
+    if (errors) say(`ERROR: ${errors} of ${rows.length + (control ? 1 : 0)} pictures got no answer from Clef; their answers are missing, not "no".`);
     say(`${rows.length} images, billed input ${res.usage.billed_input_tokens}, output ${res.usage.output_tokens}, cost $${res.usd.toFixed(6)}`);
   }
-  return unreliable ? 1 : 0;
+  return errors ? 2 : unreliable ? 1 : 0;
 }
 
 // src/commands/baseline.mjs
@@ -16998,12 +17107,12 @@ __export(baseline_exports, {
   run: () => run10
 });
 import fs28 from "node:fs";
-import crypto4 from "node:crypto";
+import crypto3 from "node:crypto";
 import path25 from "node:path";
 import { parseArgs as parseArgs9 } from "node:util";
 
 // src/claude/sessions.mjs
-import crypto3 from "node:crypto";
+import crypto2 from "node:crypto";
 import fs27 from "node:fs";
 import os2 from "node:os";
 import path24 from "node:path";
@@ -17083,6 +17192,7 @@ function listSessionFiles(configDir = claudeConfigDir()) {
   }
   return out.sort((a, b) => b.mtime - a.mtime);
 }
+var markerIn = (text, marker) => new RegExp(`${marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`).test(text);
 function findMarkedFiles(marker, { configDir = claudeConfigDir(), sinceMs = 0 } = {}) {
   const hits = [];
   for (const f of listSessionFiles(configDir)) {
@@ -17096,7 +17206,7 @@ function findMarkedFiles(marker, { configDir = claudeConfigDir(), sinceMs = 0 } 
     }
     const nl = head.indexOf("\n");
     const first = nl >= 0 ? head.slice(0, nl) : head;
-    if (first.includes(marker)) hits.push(f.file);
+    if (markerIn(first, marker)) hits.push(f.file);
   }
   return hits;
 }
@@ -17118,6 +17228,7 @@ async function parseSessionFile(file) {
     } catch {
       continue;
     }
+    if (!o || typeof o !== "object") continue;
     if (o.timestamp) {
       const t = Date.parse(o.timestamp);
       if (Number.isFinite(t)) {
@@ -17137,7 +17248,7 @@ async function parseSessionFile(file) {
           for (const x of blk.content) {
             if (x && x.type === "image") {
               views++;
-              hashes.add(crypto3.createHash("sha256").update(String(x.source && x.source.data || JSON.stringify(x.source || {}))).digest("hex"));
+              hashes.add(crypto2.createHash("sha256").update(String(x.source && x.source.data || JSON.stringify(x.source || {}))).digest("hex"));
             }
           }
         } else if (blk.type === "image") other++;
@@ -17276,7 +17387,7 @@ async function prepare(argv, { root }) {
   if (!fs28.existsSync(video)) throw new Error(`video not found: ${video}`);
   const n = Math.max(1, Math.round(Number(values.frames) || 10));
   const info = await probe(video, { root });
-  const id = crypto4.randomBytes(4).toString("hex");
+  const id = crypto3.randomBytes(4).toString("hex");
   const marker = `${MARKER_PREFIX}${id}`;
   const dir = ensureDir(path25.join(qaDir(root), `baseline-${id}`));
   const framesDir = ensureDir(path25.join(dir, "frames"));
@@ -17408,9 +17519,9 @@ var HOUSE_REVIEW = Object.freeze({
 var fmtUsd = (x) => x === null || x === void 0 ? "not measured" : `$${x >= 1 ? x.toFixed(2) : x.toFixed(4)}`;
 function fmtSeconds(s) {
   if (s === null || s === void 0) return "not measured";
-  if (s < 120) return `${Math.round(s)} s`;
-  const m = Math.floor(s / 60);
-  return `${m} min ${Math.round(s - m * 60)} s`;
+  const r = Math.round(s);
+  if (r < 120) return `${r} s`;
+  return `${Math.floor(r / 60)} min ${r % 60} s`;
 }
 
 // src/core/savings.mjs
@@ -17422,7 +17533,7 @@ function savingsRow(n, { video, sha = n.video_sha256_12, ts = (/* @__PURE__ */ n
   const e = n.old_review_estimate;
   const s = n.sagecut;
   if (!e || !sha) return null;
-  const sagecutUsd = (s.sage_usd || 0) + (s.critics_usd || 0);
+  const sagecutUsd = (s.clef_usd || 0) + (s.critics_usd || 0);
   const criticsSeconds = s.critics_seconds ?? 0;
   return {
     ts,
@@ -17441,17 +17552,30 @@ function savingsRow(n, { video, sha = n.video_sha256_12, ts = (/* @__PURE__ */ n
   };
 }
 function readRows(file = ledgerFile()) {
+  let text = "";
   try {
-    return fs29.readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    text = fs29.readFileSync(file, "utf8");
   } catch {
     return [];
   }
+  const rows = [];
+  for (const l of text.split("\n")) {
+    if (!l.trim()) continue;
+    try {
+      const r = JSON.parse(l);
+      if (r && typeof r === "object") rows.push(r);
+    } catch {
+    }
+  }
+  return rows;
 }
 function upsertRow(row, file = ledgerFile()) {
   const rows = readRows(file).filter((r) => r.sha !== row.sha);
   rows.push(row);
   fs29.mkdirSync(path26.dirname(file), { recursive: true });
-  fs29.writeFileSync(file, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs29.writeFileSync(tmp, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  fs29.renameSync(tmp, file);
   return rows;
 }
 function totals(rows, since = null) {
@@ -17508,8 +17632,8 @@ function takeFresh(file = sessionFile(), rowsFile = ledgerFile()) {
 // src/commands/numbers.mjs
 var help10 = "Write the measured QA numbers and the results card (numbers.json, card.md).";
 var ESTIMATE_METHOD = (n) => `estimate from ${n} measured frames, Claude API list prices`;
-var HOUSE_METHOD = `estimate: Opus 5.5 critics viewing the same frames, at the rate measured on Levanto's reference build ($${HOUSE_REVIEW.usd_per_frame} and ${HOUSE_REVIEW.seconds_per_frame} s per frame view: ${HOUSE_REVIEW.source}), scaled linearly to the frames Sage read; another film, not a measurement of this video; Claude API list prices`;
-var runUsd = (r, plan) => r?.usage ? sageUsd(r.usage, r.plan || plan) : r?.usd || 0;
+var HOUSE_METHOD = `estimate: Opus 5.5 critics viewing the same frames, at the rate measured on Levanto's reference build ($${HOUSE_REVIEW.usd_per_frame} and ${HOUSE_REVIEW.seconds_per_frame} s per frame view: ${HOUSE_REVIEW.source}), scaled linearly to the frames Clef read; another film, not a measurement of this video; Claude API list prices`;
+var runUsd = (r, model) => r?.usage ? clefUsd(r.usage, r.model || model) : r?.usd || 0;
 var exists = (p) => {
   try {
     return fs30.existsSync(p);
@@ -17529,23 +17653,39 @@ function openedImages(file) {
   const list = Array.isArray(j) ? j : j.images || j.opened || j.opened_by_opus || [];
   return list.map((x) => typeof x === "string" ? x : x.frame !== void 0 && x.frame !== null ? `frame:${x.frame}` : x.sha256 || x.hash || x.path || x.id || JSON.stringify(x));
 }
-function computeNumbers({ sweeps = [], triages = [], gates = [], opened = [], openedRecorded = opened.length > 0, critics = null, baseline = null, plan = "developer" }) {
+function framesOf(s) {
+  if (!Array.isArray(s.range) || !(s.step >= 1)) return null;
+  const failed = new Set(s.failed_frames || []), out = [];
+  for (let f = s.range[0]; f <= s.range[1]; f += s.step) if (!failed.has(f)) out.push(f);
+  return out;
+}
+function framesRead(sweeps) {
+  const union = /* @__PURE__ */ new Set();
+  let legacy = 0;
+  for (const s of sweeps) {
+    const fr = framesOf(s);
+    if (fr) fr.forEach((f) => union.add(f));
+    else legacy = Math.max(legacy, s.frames_read || 0);
+  }
+  return Math.max(union.size, legacy);
+}
+function computeNumbers({ sweeps = [], triages = [], gates = [], opened = [], openedRecorded = opened.length > 0, critics = null, baseline = null, model = DEFAULT_MODEL }) {
   const shas = new Set([...sweeps, ...gates].map((x) => x.video_sha256_12).filter(Boolean));
   if (baseline && baseline.video_sha256_12) shas.add(baseline.video_sha256_12);
   const out = { problems: [], video_sha256_12: shas.size === 1 ? [...shas][0] : null };
   if (shas.size > 1) out.problems.push(`the runs come from ${shas.size} different videos (${[...shas].join(", ")}); numbers from different videos are never added`);
-  const sweepUsd = sweeps.reduce((a, s) => a + runUsd(s, plan), 0);
-  const triageUsd = triages.reduce((a, t2) => a + runUsd(t2, plan), 0);
+  const sweepUsd = sweeps.reduce((a, s) => a + runUsd(s, model), 0);
+  const triageUsd = triages.reduce((a, t2) => a + runUsd(t2, model), 0);
   const gateTokens = (g) => (g.billed_input_tokens || 0) + (g.image_tokens || 0) + (g.output_tokens || 0);
-  const gateUsd = gates.reduce((a, g) => a + (gateTokens(g) ? sageUsd({ billed_input_tokens: g.billed_input_tokens, image_tokens: g.image_tokens, output_tokens: g.output_tokens }, g.plan || plan) : g.usd || 0), 0);
+  const gateUsd = gates.reduce((a, g) => a + (gateTokens(g) ? clefUsd({ billed_input_tokens: g.billed_input_tokens, image_tokens: g.image_tokens, output_tokens: g.output_tokens }, g.model || model) : g.usd || 0), 0);
   const seconds = [...sweeps, ...triages, ...gates].reduce((a, r) => a + (r.seconds || 0), 0);
   const distinct = new Set(opened);
   out.sagecut = {
-    frames_read: sweeps.length ? Math.max(...sweeps.map((s) => s.frames_read || 0)) : 0,
+    frames_read: framesRead(sweeps),
     qa_seconds: Number(seconds.toFixed(1)),
-    sage_usd: Number((sweepUsd + triageUsd + gateUsd).toFixed(6)),
-    sage_usd_parts: { sweep: Number(sweepUsd.toFixed(6)), triage: Number(triageUsd.toFixed(6)), gate: Number(gateUsd.toFixed(6)) },
-    sage_plan: plan,
+    clef_usd: Number((sweepUsd + triageUsd + gateUsd).toFixed(6)),
+    clef_usd_parts: { sweep: Number(sweepUsd.toFixed(6)), triage: Number(triageUsd.toFixed(6)), gate: Number(gateUsd.toFixed(6)) },
+    clef_model: model,
     critics_usd: critics ? critics.usd : null,
     critics_price_unknown: critics ? critics.price_unknown : [],
     critics_tokens: critics ? critics.tokens : null,
@@ -17555,8 +17695,8 @@ function computeNumbers({ sweeps = [], triages = [], gates = [], opened = [], op
     frames_opened_by_claude: openedRecorded ? distinct.size : null,
     // null: no opened.json, so nothing was recorded
     critics_seconds: critics && Number.isFinite(critics.seconds) ? Number(critics.seconds.toFixed(1)) : null,
-    sage_asked: gates.reduce((a, g) => a + (g.sage_asked || 0), 0),
-    sage_errors: gates.reduce((a, g) => a + (g.sage_errors || 0), 0)
+    clef_asked: gates.reduce((a, g) => a + (g.clef_asked || 0), 0),
+    clef_errors: gates.reduce((a, g) => a + (g.clef_errors || 0), 0)
   };
   const sum = (xs) => xs.length ? Number(xs.reduce((a, x) => a + (x || 0), 0).toFixed(1)) : null;
   out.time_by_step = {
@@ -17596,20 +17736,20 @@ function computeNumbers({ sweeps = [], triages = [], gates = [], opened = [], op
       method: HOUSE_METHOD
     };
   } else out.old_review_estimate = null;
-  out.baseline_note = out.old_review_estimate ? null : out.problems.length ? "the runs are not all from the same video: no comparison is shown" : !out.sagecut.frames_read ? "no sweep: Sage read no frames, so no comparison is shown" : `the baseline model has no list price (${(b.price_unknown || []).join(", ")}): no comparison is shown`;
+  out.baseline_note = out.old_review_estimate ? null : out.problems.length ? "the runs are not all from the same video: no comparison is shown" : !out.sagecut.frames_read ? "no sweep: Clef read no frames, so no comparison is shown" : `the baseline model has no list price (${(b.price_unknown || []).join(", ")}): no comparison is shown`;
   return out;
 }
 function renderCard(n, runsUsed) {
   const s = n.sagecut;
   const L = ["# SageCut results", ""];
   L.push("## SageCut (measured)", "");
-  L.push(`- Frames Sage read: ${s.frames_read}`);
+  L.push(`- Frames Clef read: ${s.frames_read}`);
   L.push(`- QA time: ${fmtSeconds(s.qa_seconds)}`);
-  L.push(`- Sage cost: ${fmtUsd(s.sage_usd)} (${s.sage_plan} plan rate)`);
+  L.push(`- Clef cost: ${fmtUsd(s.clef_usd)} (${s.clef_model} model rate)`);
   L.push(`- Critics' cost: ${s.critics_usd === null ? s.critics_price_unknown.length ? `price unknown for ${s.critics_price_unknown.join(", ")}` : "not measured" : `${fmtUsd(s.critics_usd)} at Claude API list prices`}`);
   L.push(s.frames_opened_by_claude === null ? "- Frames recorded as opened by Claude: not recorded (no opened.json in the run)" : `- Frames recorded as opened by Claude (from opened.json): ${s.frames_opened_by_claude}`);
   if (s.critics_image_views !== null) L.push(`- Critics' image views: ${s.critics_image_views} (${s.critics_distinct_images} different images)`);
-  if (s.sage_asked) L.push(`- Sage questions with no answer (errors): ${s.sage_errors} of ${s.sage_asked}`);
+  if (s.clef_asked) L.push(`- Clef questions with no answer (errors): ${s.clef_errors} of ${s.clef_asked}`);
   if (n.triage) L.push(`- Open items after triage: ${Object.entries(n.triage.counts).map(([k, v]) => `${v} ${k}`).join(", ")}`);
   L.push("");
   L.push("## The old review of the same frames (estimate)", "");
@@ -17618,7 +17758,7 @@ function renderCard(n, runsUsed) {
     L.push(`- Time: ${fmtSeconds(e.seconds)} (estimate)`);
     L.push(`- Cost: ${fmtUsd(e.usd)} (estimate)`);
     L.push(`- Method: ${e.method}.`);
-    L.push(e.reference === "house" ? `- The same ${e.frames} frames that Sage read, at ${fmtUsd(e.usd_per_frame)} and ${e.seconds_per_frame} s per frame view (the reference build's rate, scaled linearly).` : `- The same ${e.frames} frames that Sage read; ${fmtSeconds(e.seconds_per_frame)} and ${fmtUsd(e.usd_per_frame)} per frame, measured on ${e.baseline_frames} frames.`);
+    L.push(e.reference === "house" ? `- The same ${e.frames} frames that Clef read, at ${fmtUsd(e.usd_per_frame)} and ${e.seconds_per_frame} s per frame view (the reference build's rate, scaled linearly).` : `- The same ${e.frames} frames that Clef read; ${fmtSeconds(e.seconds_per_frame)} and ${fmtUsd(e.usd_per_frame)} per frame, measured on ${e.baseline_frames} frames.`);
   } else L.push(`- ${n.baseline_note || "not available"}.`);
   const tb = n.time_by_step || {};
   const step = (label, v) => `- ${label}: ${v === null || v === void 0 ? "not measured" : fmtSeconds(v)}`;
@@ -17660,7 +17800,7 @@ async function run11(argv, { root, config }) {
   }
   if (values.json) setQuiet(true);
   const qa = qaDir(root);
-  let runDirs = (values.runs || []).map((d) => path27.resolve(d));
+  let runDirs = [...new Set((values.runs || []).map((d) => path27.resolve(d)))];
   if (!runDirs.length) {
     const sw = dirsOf(qa, "sweep-").filter((d) => exists(path27.join(d, "sweep.json"))).pop();
     const gt = dirsOf(qa, "gate-").filter((d) => exists(path27.join(d, "findings.json"))).pop();
@@ -17690,7 +17830,7 @@ async function run11(argv, { root, config }) {
     }
     if (exists(path27.join(d, "findings.json"))) {
       const f = readJson(path27.join(d, "findings.json"));
-      const sg = f.sage || {};
+      const sg = f.clef || {};
       gates.push({
         video: f.video,
         video_sha256_12: f.video_sha256_12,
@@ -17698,9 +17838,10 @@ async function run11(argv, { root, config }) {
         billed_input_tokens: sg.billed_input_tokens || 0,
         image_tokens: sg.image_tokens || 0,
         output_tokens: sg.output_tokens || 0,
+        model: sg.model,
         seconds: Number(f.seconds || 0),
-        sage_asked: f.sage_asked || 0,
-        sage_errors: (f.sage_errors || []).length
+        clef_asked: f.clef_asked || 0,
+        clef_errors: (f.clef_errors || []).length
       });
       used.push(`${rel}/findings.json`);
       hit = true;
@@ -17728,13 +17869,13 @@ async function run11(argv, { root, config }) {
     used.push(`${path27.relative(root, bdir) || bdir}/baseline.json`);
   } else if (bdir) throw new Error(`no baseline.json in ${bdir}. Run "sagecut baseline measure <marker>" first.`);
   if (!baseline) used.push(`reference rate for the old review: src/core/costs.mjs HOUSE_REVIEW (${HOUSE_REVIEW.source})`);
-  const n = computeNumbers({ sweeps, triages, gates, opened, openedRecorded, critics, baseline, plan: config.plan });
+  const n = computeNumbers({ sweeps, triages, gates, opened, openedRecorded, critics, baseline });
   n.generated = (/* @__PURE__ */ new Date()).toISOString();
   n.sources = used;
   writeJson(path27.join(qa, "numbers.json"), n);
   const card = renderCard(n, used);
   fs30.writeFileSync(path27.join(qa, "card.md"), card);
-  const row = n.problems.length ? null : savingsRow(n, { video: gates.find((g) => g.video)?.video });
+  const row = n.problems.length ? null : savingsRow(n, { video: gates.find((g) => g.video)?.video || sweeps.find((s) => s.video)?.video });
   if (row) upsertRow(row);
   if (values.json) console.log(JSON.stringify(n));
   else {
@@ -17749,6 +17890,7 @@ var deliver_check_exports = {};
 __export(deliver_check_exports, {
   checkVideo: () => checkVideo,
   covered: () => covered,
+  finalFailures: () => finalFailures,
   fixVideo: () => fixVideo,
   help: () => help11,
   holdRanges: () => holdRanges,
@@ -17916,9 +18058,10 @@ async function checkVideo(video, ctx, { frameSet = null, ocr = true } = {}) {
     add("audio stream", "pass", "present");
     const l = await loudness(video, { root });
     if (!l) add("loudness", "skip", "could not measure");
+    else if (l.lufs == null) add("loudness", "fail", "the audio track is silent: no loudness to measure (target -14 LUFS)");
     else {
       add("loudness", Math.abs(l.lufs + 14) <= 1 ? "pass" : "fail", `${l.lufs.toFixed(1)} LUFS (target -14 +/- 1)`);
-      add("true peak", l.truePeak <= -1 ? "pass" : "fail", `${l.truePeak.toFixed(1)} dBTP (limit -1)`);
+      if (l.truePeak != null) add("true peak", l.truePeak <= -1 ? "pass" : "fail", `${l.truePeak.toFixed(1)} dBTP (limit -1)`);
     }
     const sil = await silenceRuns(video, root);
     if (sil.length) add("digital silence", "fail", `${sil.length} run(s) of true zero audio of 0.5 s or more: ${sil.slice(0, 5).map((s) => `${s.start.toFixed(2)} s${s.duration ? ` for ${s.duration.toFixed(2)} s` : " to the end"}`).join(", ")}. Use room tone.`);
@@ -17991,6 +18134,11 @@ async function fixVideo(video, checks2, out, { root }) {
   if (r.code !== 0) throw new Error(`the fix failed: ${r.stderr.trim().split("\n").slice(-3).join(" | ")}`);
   return { mode: range ? "re-encode (limited range, crf 17, faststart)" : "remux (faststart)", out };
 }
+function finalFailures(checks2, recheck) {
+  if (!recheck) return checks2.filter((c) => c.status === "fail");
+  const rerun = new Map(recheck.filter((c) => c.status !== "skip").map((c) => [c.name, c]));
+  return [...recheck.filter((c) => c.status === "fail"), ...checks2.filter((c) => c.status === "fail" && !rerun.has(c.name))];
+}
 async function run12(argv, ctx) {
   const { values, positionals } = parseArgs11({ args: argv, allowPositionals: true, options: {
     fix: { type: "boolean" },
@@ -18021,7 +18169,7 @@ async function run12(argv, ctx) {
     fixed = await fixVideo(video, checks2, out, { root: ctx.root });
     if (fixed) recheck = (await checkVideo(out, ctx, { ocr: false })).checks;
   }
-  const failing = (recheck || checks2).filter((c) => c.status === "fail");
+  const failing = finalFailures(checks2, recheck);
   const report = { video, runDir, ok: failing.length === 0, checks: checks2, ...fixed ? { fixed, recheck } : {} };
   fs32.writeFileSync(path28.join(runDir, "report.json"), JSON.stringify(report, null, 1) + "\n");
   if (values.json) {
@@ -18055,7 +18203,7 @@ import { parseArgs as parseArgs12 } from "node:util";
 import fs33 from "node:fs";
 import os3 from "node:os";
 import path29 from "node:path";
-import crypto5 from "node:crypto";
+import crypto4 from "node:crypto";
 import { spawn as spawn2 } from "node:child_process";
 function parseRange2(str) {
   const m = String(str || "").match(/^(\d+)-(\d+)$/);
@@ -18084,7 +18232,12 @@ async function planSplice(master, [a, b], { root }) {
   const next = keys.find((k) => k > b);
   const g1 = next === void 0 ? total - 1 : next - 1;
   const info = await probe(master, { root });
-  return { total, keyframes: keys, g0, g1, frames: g1 - g0 + 1, fps: info.fps, requested: [a, b], index: idx, info };
+  const warnings = [];
+  const sei = readX264Options(master);
+  const bframes = Number(((sei.options || "").match(/\bbframes=(\d+)/) || [])[1] || 0);
+  if (bframes > 0) warnings.push(`The master uses ${bframes} B-frames. A splice into it usually fails the packet-timing proof; render the full video instead, or deliver masters encoded without B-frames.`);
+  if (!sei.options) warnings.push("The master has no x264 encoder text; splice works only on masters that x264 wrote (Remotion --codec h264).");
+  return { total, keyframes: keys, g0, g1, frames: g1 - g0 + 1, fps: info.fps, requested: [a, b], index: idx, info, warnings };
 }
 function readX264Options(file) {
   const fd = fs33.openSync(file, "r");
@@ -18183,7 +18336,7 @@ async function streamMd5(file, root) {
   for await (const c of p.stdout) {
     buf = buf.length ? Buffer.concat([buf, c]) : c;
     while (buf.length >= fsz) {
-      hashes.push(crypto5.createHash("md5").update(buf.subarray(0, fsz)).digest("hex"));
+      hashes.push(crypto4.createHash("md5").update(buf.subarray(0, fsz)).digest("hex"));
       buf = buf.subarray(fsz);
     }
   }
@@ -18367,12 +18520,13 @@ async function run13(argv, ctx) {
       const range = parseRange2(values.frames);
       const p = await planSplice(master, range, { root });
       if (values.json) {
-        say(JSON.stringify({ first: p.g0, last: p.g1, frames: p.frames, keyframes: p.keyframes.length, total: p.total }));
+        say(JSON.stringify({ first: p.g0, last: p.g1, frames: p.frames, keyframes: p.keyframes.length, total: p.total, warnings: p.warnings }));
         return 0;
       }
+      for (const w of p.warnings) say(`WARNING: ${w}`);
       say(`Master: ${p.total} frames at ${p.fps} fps, ${p.keyframes.length} keyframes.`);
       say(`You asked for frames ${range[0]}-${range[1]}. The GOP-aligned range is ${p.g0}-${p.g1} (${p.frames} frames).`);
-      say(`Render it:  npx remotion render <id> patch.mp4 --codec h264 --crf 17 --frames=${p.g0}-${p.g1}`);
+      say(`Render it:  npx remotion render <id> patch.mp4 --codec h264 --crf 17 --color-space bt709 --frames=${p.g0}-${p.g1}`);
       say(`Then:       sagecut splice apply ${path30.basename(master)} patch.mp4 --frames ${p.g0}-${p.g1}`);
       return 0;
     }
@@ -18422,7 +18576,7 @@ import { fileURLToPath as fileURLToPath4 } from "node:url";
 import { parseArgs as parseArgs13 } from "node:util";
 var help13 = "onboarding state: status | welcome | done";
 var stateFile = () => path31.join(userDataDir(), "state.json");
-var FALLBACK = "Welcome to SageCut, a way to produce Remotion videos faster and cheaper, with every frame checked by the Sage decision model.";
+var FALLBACK = "Welcome to SageCut, a way to produce Remotion videos faster and cheaper, with every frame checked by the Clef decision model on Cloudflare Workers AI.";
 function isRemotionProject(root) {
   try {
     const p = readJson(path31.join(root, "package.json"));
@@ -18436,7 +18590,7 @@ function status(root, config) {
   const state = readJson(stateFile(), {});
   return {
     onboarded: Boolean(state.onboarded),
-    hasKey: loadSageEnv(root).hasKey,
+    hasKey: loadClefEnv(root).hasKey,
     hasBrand: fs34.existsSync(config ? config.brandPath : path31.join(sagecutDir(root), "brand.yaml")),
     hasSchedule: fs34.existsSync(config ? config.schedulePath : path31.join(sagecutDir(root), "schedule.json")),
     isRemotionProject: isRemotionProject(root),
@@ -18512,7 +18666,7 @@ async function run15(argv) {
   const sess = readSession();
   const rows = readRows();
   if (!rows.length) {
-    say('No delivered video has savings yet. Savings appear after "sagecut numbers" runs on a video that Sage swept.');
+    say('No delivered video has savings yet. Savings appear after "sagecut numbers" runs on a video that Clef swept.');
     return 0;
   }
   say(sess ? sessionLine(totals(rows, sess.startedAt)) : sessionLine(totals(rows, null), "SageCut, all videos"));
@@ -18538,7 +18692,7 @@ var COMMANDS = {
 };
 function usage() {
   const lines = Object.entries(COMMANDS).map(([k, m]) => `  ${k.padEnd(15)} ${m.help || ""}`);
-  return `sagecut ${VERSION}: video QA for Remotion with the Sage decision model
+  return `sagecut ${VERSION}: video QA for Remotion with the Clef decision model (Cloudflare Workers AI)
 
 usage: sagecut <command> [options]
 
@@ -18563,8 +18717,17 @@ async function main() {
 ${usage()}`);
     return 2;
   }
-  const rootArg = argv.indexOf("--root");
-  const root = findProjectRoot(rootArg >= 0 ? argv[rootArg + 1] : process.cwd());
+  if (cmd === "savings") {
+    try {
+      return await mod.run(argv);
+    } catch (e) {
+      if (["stop", "session-start"].includes(argv[0])) return 0;
+      throw e;
+    }
+  }
+  const at = argv.findIndex((a) => a === "--root" || a.startsWith("--root="));
+  const rootArg = at < 0 ? null : argv[at].startsWith("--root=") ? argv[at].slice("--root=".length) : argv[at + 1];
+  const root = findProjectRoot(rootArg || process.cwd());
   const config = loadConfig(root);
   return mod.run(argv, { root, config });
 }

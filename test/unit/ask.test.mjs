@@ -101,3 +101,8 @@ test('expandGlob: * ? ** and literal paths', () => {
   assert.deepEqual(names('nope*.png'), []);
   fs.rmSync(d, { recursive: true, force: true });
 });
+
+test('makeControl: "none" or no control gives no control, as its error message promises', () => {
+  assert.equal(makeControl('none', frame()), null);
+  assert.equal(makeControl(undefined, frame()), null);
+});

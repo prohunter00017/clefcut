@@ -1,4 +1,4 @@
-# SageCut gate question bank (v1). Every question is a yes/no or a scale question that Sage answers about ONE prepared picture:
+# SageCut gate question bank (v1). Every question is a yes/no or a scale question that Clef answers about ONE prepared picture:
 # a settled frame, a phone-size frame, a contact sheet of one beat, or a difference image of two frames.
 # A fail answer is a finding. A null answer, or a scale answer within `escalate margin` of the pass line, is an escalation.
 # Questions marked escalate_only never make a finding. {expected_order} is filled from the schedule.
@@ -73,11 +73,11 @@ questions:
     image: frame
     instructions: How clear is the reading order of this frame?
     levels:
-      - { level: 0, description: No clear entry point; elements compete equally }
-      - { level: 1, description: Entry point exists but second read is ambiguous }
-      - { level: 2, description: Readable order, but two tiers look nearly the same size or weight }
-      - { level: 3, description: Clear order; tiers distinct; minor crowding }
-      - { level: 4, description: One obvious read path; tiers clearly separated by size, weight and space }
+      - { level: 0, description: "No clear entry point; elements compete equally" }
+      - { level: 1, description: "Entry point exists but second read is ambiguous" }
+      - { level: 2, description: "Readable order, but two tiers look nearly the same size or weight" }
+      - { level: 3, description: "Clear order; tiers distinct; minor crowding" }
+      - { level: 4, description: "One obvious read path; tiers clearly separated by size, weight and space" }
     pass_at_least: 3
     severity: major
     escalate_only: true

@@ -20,7 +20,7 @@ export function topMotionFrames(d, n = CAPS.motion) {
 }
 
 export function frameOfRow(row) {
-  const [a, b] = row.frames;
+  const a = row.frames[0], b = row.frames[row.frames.length - 1];
   return b === a + 1 ? b : (a + b) >> 1;
 }
 
@@ -34,7 +34,7 @@ function evenly(list, k) {
 export function selectCriticFrames({ sched, settled, rows, beatOf, max = MAX_CRITIC_FRAMES, total, motion = [] }) {
   const sorted = [...rows].sort((a, b) => (SEVERITY_RANK[a.severity] ?? 2.5) - (SEVERITY_RANK[b.severity] ?? 2.5) || a.frames[0] - b.frames[0]);
   const q = {
-    finding: sorted.map((r) => ({ frame: frameOfRow(r), reason: `${r.source === 'sage' ? 'Sage' : 'measured'} ${r.check}` })),
+    finding: sorted.map((r) => ({ frame: frameOfRow(r), reason: `${r.source === 'clef' ? 'Clef' : 'measured'} ${r.check}` })),
     beat: evenly(settled.map((s) => ({ frame: s.frame, reason: `beat ${s.beat} settled frame` })), CAPS.beat),
     transition: (sched.transitions || []).map((t) => ({ frame: Math.round((t.frames[0] + t.frames[1]) / 2), reason: `transition ${t.from || '?'} to ${t.to || '?'} midpoint` })),
     element: (sched.beats || []).flatMap((b) => (b.elements || []).flatMap((e) => [

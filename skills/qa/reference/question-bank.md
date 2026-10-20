@@ -1,13 +1,13 @@
 # Question bank
 
-Sage answers yes/no questions about images. SageCut asks a fixed set of questions in `gate`, `sweep` and `triage`. You can also ask your own with `sagecut ask`.
+Clef answers yes/no questions about images. SageCut asks a fixed set of questions in `gate`, `sweep` and `triage`. You can also ask your own with `sagecut ask`.
 
 ## What a good question looks like
 
 1. It asks about one defect or one prepared picture.
 2. A "yes" answer means the defect is present.
 3. It uses plain words about what a viewer sees.
-4. It has a control: a frame with a known defect. Sage must find the defect in the control.
+4. It has a control: a frame with a known defect. Clef must find the defect in the control.
 
 ## Kinds of questions
 
@@ -37,7 +37,7 @@ Use `sagecut gate <video> --bank FILE` to run a different gate question file. Us
 
 ## Controls
 
-A control runs in the same batch as its question. If Sage does not find the defect in the control, the "no" answers to that question are not reliable. The tool marks the run as unreliable. Then a measurement must decide.
+A control is asked the same question, next to the frames. If Clef does not find the defect in the control, the "no" answers to that question are not reliable. The tool marks the run as unreliable. Then a measurement must decide.
 
 | Control | How the tool makes it from your own frames |
 |---|---|
@@ -56,14 +56,14 @@ The tool picks a default control from the question. Use `--control` to choose an
 sagecut ask --images "sagecut/qa/<run>/img/*.png" --question "Is any text cut off by the edge of the frame?" --width 350 --control cut
 ```
 
-- `--width` sets the width at which Sage reads the frame. For legibility, use the test width of the brand.
-- The tool prints a table of results. Every answer is logged in `sagecut/metrics/sage.jsonl`.
+- `--width` sets the width at which Clef reads the frame. For legibility, use the test width of the brand.
+- The tool prints a table of results. The token use and cost of each run are logged in `sagecut/metrics/clef.jsonl`.
 - A question about a defect that does not exist in your frames still needs a control. Without it, a row of "no" answers proves nothing.
 
 ## Rules
 
-1. Do not trust one Sage answer from one run. A measurement decides each open item.
+1. Do not trust one Clef answer from one run. A measurement decides each open item.
 2. Put a project question set in the file that `question_bank` names in `sagecut/sagecut.yaml`. This is optional.
 3. Keep questions general. Do not name objects that only one video has.
 4. A "yes" without a measurement goes to the list of items to check. It is not yet a finding.
-5. Sage reads legibility at the test width. OCR reads at full resolution.
+5. Clef reads legibility at the test width. OCR reads at full resolution.

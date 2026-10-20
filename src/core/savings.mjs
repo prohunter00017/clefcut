@@ -11,7 +11,7 @@ export const sessionFile = () => path.join(userDataDir(), 'session.json');
 export function savingsRow(n, { video, sha = n.video_sha256_12, ts = new Date().toISOString() } = {}) {
   const e = n.old_review_estimate; const s = n.sagecut;
   if (!e || !sha) return null;
-  const sagecutUsd = (s.sage_usd || 0) + (s.critics_usd || 0);
+  const sagecutUsd = (s.clef_usd || 0) + (s.critics_usd || 0);
   const criticsSeconds = s.critics_seconds ?? 0;      // the critics' time is part of SageCut's time
   return {
     ts, sha, video: path.basename(video || 'unknown'), frames: s.frames_read,
@@ -23,8 +23,16 @@ export function savingsRow(n, { video, sha = n.video_sha256_12, ts = new Date().
   };
 }
 
+// A torn or bad line is skipped; it never costs the other rows.
 export function readRows(file = ledgerFile()) {
-  try { return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; }
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch { return []; }
+  const rows = [];
+  for (const l of text.split('\n')) {
+    if (!l.trim()) continue;
+    try { const r = JSON.parse(l); if (r && typeof r === 'object') rows.push(r); } catch { /* torn line */ }
+  }
+  return rows;
 }
 
 // One row per video hash: a second run for the same film replaces the first row.
@@ -32,7 +40,9 @@ export function upsertRow(row, file = ledgerFile()) {
   const rows = readRows(file).filter((r) => r.sha !== row.sha);
   rows.push(row);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  const tmp = `${file}.${process.pid}.tmp`;                // write, then rename: a crash never leaves half a ledger
+  fs.writeFileSync(tmp, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  fs.renameSync(tmp, file);
   return rows;
 }
 

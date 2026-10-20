@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import * as ff from '../core/ffmpeg.mjs';
-import { SageClient } from '../core/sage.mjs';
+import { ClefClient } from '../core/clef.mjs';
 import { readJson, writeJson, say, setQuiet } from '../core/log.mjs';
 import { loadBank, badAnswer } from '../sweep/bank.mjs';
 import { makeExplainer, splitFlags, flagRows, typedFrames } from '../sweep/runs.mjs';
@@ -12,8 +12,9 @@ import { makeControl, inkInfo } from '../sweep/synth.mjs';
 import { decodeFrame, pngUri } from '../sweep/images.mjs';
 import { popRatio } from '../sweep/measure.mjs';
 import { loadContext, num } from '../sweep/common.mjs';
+import { fileSha12 } from '../sweep/images.mjs';
 
-export const help = 'Explain sweep flags by the schedule, then ask Sage about the rest, each question with a control.';
+export const help = 'Explain sweep flags by the schedule, then ask Clef about the rest, each question with a control.';
 
 const POP_CONFIRM = 3.0;
 
@@ -41,7 +42,7 @@ export async function run(argv, { root, config }) {
     root: { type: 'string' }, video: { type: 'string' }, edge: { type: 'string' }, json: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help || !positionals.length) {
     console.log('usage: sagecut triage <sweep-run-dir> [--video FILE] [--edge N] [--json]\n\n' +
-      'Explains sweep flags by the schedule (tolerance --edge frames, default 15), then asks Sage about the residual runs.\n' +
+      'Explains sweep flags by the schedule (tolerance --edge frames, default 15), then asks Clef about the residual runs.\n' +
       'Each question has a synthetic control from your own frames. Writes triage.json and triage.md in the run folder.');
     return values.help ? 0 : 2;
   }
@@ -53,6 +54,8 @@ export async function run(argv, { root, config }) {
   const sw = readJson(sweepFile);
   const video = path.resolve(values.video || sw.video);
   if (!fs.existsSync(video)) throw new Error(`video not found: ${video}. Pass --video FILE.`);
+  const sha = await fileSha12(video);
+  if (sw.video_sha256_12 && sha !== sw.video_sha256_12) throw new Error(`${video} is not the video the sweep read (sha ${sha}, the sweep read ${sw.video_sha256_12}). Sweep this video first, or pass the swept file with --video.`);
   const info = await ff.probe(video, { root });
   const ctx = loadContext(config);
   const bank = loadBank(config);
@@ -68,8 +71,8 @@ export async function run(argv, { root, config }) {
   const flaggedAll = new Set(Object.values(flags).flat());
   say(`flagged ${[...flaggedAll].length} frames; explained ${Object.values(explained).reduce((a, b) => a + b, 0)} frame-answers ${JSON.stringify(explained)}; residual runs ${residual.length}`);
 
-  // 2. glitch runs are measured; the others get targeted Sage asks
-  let usage = zeroUsage(); let usd = 0;
+  // 2. glitch runs are measured; the others get targeted Clef asks
+  let usage = zeroUsage(); let usd = 0; let model = null;
   const controls = {};
   const byQ = {};
   for (const r of residual) (byQ[r.q] = byQ[r.q] || []).push(r);
@@ -79,7 +82,7 @@ export async function run(argv, { root, config }) {
         const m = await popRatio(video, { root, fps: info.fps, total: info.frames, run: r });
         r.check = 'measurement';
         r.measure = m;
-        if (m.ratio == null) { r.label = 'to-measure'; r.detail = 'too few frames around the run to measure'; }
+        if (m.ratio == null) { r.label = 'to-measure'; r.detail = m.reason || 'too few frames around the run to measure'; }
         else if (m.ratio >= POP_CONFIRM) { r.label = 'confirmed'; r.detail = `one-frame pop ${m.pop} is ${m.ratio}x the local median (f${m.frame})`; }
         else { r.label = 'cleared-by-measurement'; r.detail = `one-frame pop ${m.pop} is ${m.ratio}x the local median (f${m.frame}), under ${POP_CONFIRM}x`; }
       }
@@ -93,8 +96,8 @@ export async function run(argv, { root, config }) {
     const width = tq.width === 'test' ? ctx.testWidth : Number(tq.width) || 960;
     const bad = tq.bad || badAnswer(q);
     const variants = tq.questions.map((t, i) => ({ id: `v${i}`, instructions: t }));
-    const client = new SageClient({ root, workers: config.workers || 4, plan: config.plan, tag: 'triage' });
-    client.headers();
+    const client = new ClefClient({ root, workers: config.workers || 4, tag: 'triage' });
+    client.check(); model = client.model;
     // the control, from the user's own clean frame
     let control = null;
     const cf = await pickControlFrame({ video, info, root, typed: typedFrames(ctx.schedule), flagged: flaggedAll });
@@ -121,19 +124,19 @@ export async function run(argv, { root, config }) {
         for (const v of variants) { const a = row.answers[v.id]; if (a) answers.push({ frame: f, variantId: v.id, answer: a.answer, p: a.p, error: a.error || null }); }
       }
       const v = runVerdict(answers, res.controls, bad, pmin);
-      r.check = 'sage'; r.label = v.label; r.detail = v.detail; r.votes = { n: v.n, problems: v.problems, voided: v.voided, weak: v.weak };
+      r.check = 'clef'; r.label = v.label; r.detail = v.detail; r.votes = { n: v.n, problems: v.problems, voided: v.voided, weak: v.weak };
       r.answers = answers.map(({ frame, variantId, answer, p }) => ({ frame, variant: variantId, answer, p }));
     }
   }
 
-  const counts = { 'cleared-by-measurement': 0, 'cleared-by-sage': 0, confirmed: 0, 'to-measure': 0 };
+  const counts = { 'cleared-by-measurement': 0, 'cleared-by-clef': 0, confirmed: 0, 'to-measure': 0 };
   for (const r of residual) counts[r.label]++;
   const out = {
-    sweep: path.basename(dir), video, pmin, edge, flagged: sw.flagged || Object.fromEntries(Object.entries(flags).map(([q, v]) => [q, v.length])),
+    sweep: path.basename(dir), video, video_sha256_12: sha, pmin, edge, flagged: sw.flagged || Object.fromEntries(Object.entries(flags).map(([q, v]) => [q, v.length])),
     explained, residual_runs: residual.length, counts,
     residual: residual.map((r) => ({ q: r.q, frames: r.frames, n: r.n, ask_frame: r.ask_frame, label: r.label, check: r.check, detail: r.detail,
       measure: r.measure, votes: r.votes, answers: r.answers })),
-    controls, usage, usd: Number(usd.toFixed(6)), plan: config.plan, seconds: Number(((Date.now() - t0) / 1000).toFixed(1)),
+    controls, usage, usd: Number(usd.toFixed(6)), model, seconds: Number(((Date.now() - t0) / 1000).toFixed(1)),
   };
   writeJson(path.join(dir, 'triage.json'), out);
   const md = markdown(out);
@@ -160,7 +163,7 @@ function markdown(o) {
     }
     L.push('');
   }
-  L.push(`Sage cost $${o.usd.toFixed(6)}, ${o.usage.billed_input_tokens} text + ${o.usage.image_tokens || 0} image input tokens, ${o.seconds} s.`);
-  L.push('"confirmed" means a repeated flag: measure it next. A Sage answer alone is never proof.');
+  L.push(`Clef cost $${o.usd.toFixed(6)}, ${o.usage.billed_input_tokens} text + ${o.usage.image_tokens || 0} image input tokens, ${o.seconds} s.`);
+  L.push('"confirmed" means a repeated flag: measure it next. A Clef answer alone is never proof.');
   return L.join('\n') + '\n';
 }

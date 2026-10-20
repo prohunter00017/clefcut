@@ -66,6 +66,17 @@ export function normalize(s) {
   return s;
 }
 
+// The schedule cut to the frames the video has: beats and transitions that start past the last frame are dropped,
+// the rest end at the last frame. A short render must not be judged on frames it does not have.
+export function clipSchedule(s, n) {
+  const last = n - 1, cl = (f) => Math.min(f, last), start = (c) => (Array.isArray(c) ? c[0] : c);
+  const beats = s.beats.filter((b) => b.start <= last).map((b) => ({ ...b, end: cl(b.end),
+    ...(Array.isArray(b.hold) ? { hold: [cl(b.hold[0]), cl(b.hold[1])] } : {}),
+    elements: (b.elements || []).filter((e) => e.in <= last).map((e) => (e.out != null ? { ...e, out: cl(e.out) } : e)) }));
+  const transitions = (s.transitions || []).filter((t) => t.frames[0] <= last).map((t) => ({ ...t, frames: [t.frames[0], cl(t.frames[1])] }));
+  return { ...s, beats, transitions, cuts: (s.cuts || []).filter((c) => start(c) <= last) };
+}
+
 export const beatAt = (s, f) => s.beats.find((b) => f >= b.start && f <= b.end) || null;
 export const elementsOnAt = (s, f) => s.beats.flatMap((b) => b.elements.filter((e) => f >= e.in && f <= e.out).map((e) => ({ ...e, beat: b.id })));
 export const inTransition = (s, f) => s.transitions.find((t) => f >= t.frames[0] && f <= t.frames[1]) || null;

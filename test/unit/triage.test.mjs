@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { makeExplainer, splitFlags } from '../../src/sweep/runs.mjs';
 import { runVerdict, judgeControl } from '../../src/sweep/controlled.mjs';
 import { sampleFrames } from '../../src/commands/triage.mjs';
-import { popValues } from '../../src/sweep/measure.mjs';
+import { popValues, popRatio } from '../../src/sweep/measure.mjs';
+import { loadConfig } from '../../src/core/config.mjs';
 
 const schedule = {
   fps: 60, frames: 600,
@@ -31,9 +35,9 @@ test('explainer: tolerance of 15 frames around in and out', () => {
   assert.equal(why(190 + 16, 'cut'), null);
 });
 
-test('explainer: a designed glitch effect in the brand explains glitch flags only', () => {
+test('explainer: the brand designed list alone explains no glitch flag (the schedule must declare the frames)', () => {
   const why = makeExplainer(schedule, { frames: 600, designed: new Set(['glitch']) });
-  assert.equal(why(500, 'glitch'), 'designed effect (brand)');
+  assert.equal(why(500, 'glitch'), null);
   assert.equal(why(500, 'cut'), null);
 });
 
@@ -67,8 +71,8 @@ test('verdict: confirmed when at least half the valid answers flag it', () => {
   assert.equal(v.label, 'confirmed');
 });
 
-test('verdict: cleared-by-sage needs two valid "no" answers and an ok control', () => {
-  assert.equal(runVerdict([A('v0', 'no', 0.05), A('v1', 'no', 0.1)], ok, 'yes', 0.8).label, 'cleared-by-sage');
+test('verdict: cleared-by-clef needs two valid "no" answers and an ok control', () => {
+  assert.equal(runVerdict([A('v0', 'no', 0.05), A('v1', 'no', 0.1)], ok, 'yes', 0.8).label, 'cleared-by-clef');
   assert.equal(runVerdict([A('v0', 'no', 0.05)], ok, 'yes', 0.8).label, 'to-measure');       // one answer is never proof
 });
 
@@ -97,7 +101,7 @@ test('verdict: a weak "yes" blocks clearing; mixed answers go to measurement', (
 
 test('verdict: legibility polarity (bad = no)', () => {
   assert.equal(runVerdict([A('v0', 'no', 0.05), A('v1', 'no', 0.1)], ok, 'no', 0.8).label, 'confirmed');
-  assert.equal(runVerdict([A('v0', 'yes', 0.95), A('v1', 'yes', 0.9)], ok, 'no', 0.8).label, 'cleared-by-sage');
+  assert.equal(runVerdict([A('v0', 'yes', 0.95), A('v1', 'yes', 0.9)], ok, 'no', 0.8).label, 'cleared-by-clef');
 });
 
 test('judgeControl', () => {
@@ -117,4 +121,35 @@ test('popValues: a one-frame pop stands out from steady motion', () => {
   assert.ok(P[0] < 1);
   const ramp = [mk(10), mk(20), mk(30), mk(40), mk(50)];
   assert.ok(Math.max(...popValues(ramp, w, h, 30)) < 1);  // steady change has no pop
+});
+
+test('explainer: a designed glitch is explained only inside its declared effect frames, and only when the brand allows it', () => {
+  const sched = { beats: [], transitions: [], cuts: [], effects: [{ kind: 'glitch', frames: [150, 156] }] };
+  const allow = makeExplainer(sched, { designed: new Set(['glitch']) });
+  assert.match(allow(152, 'glitch'), /designed/);
+  assert.equal(allow(80, 'glitch'), null);                                            // the brand alone hides nothing
+  assert.equal(makeExplainer(sched, { designed: new Set() })(152, 'glitch'), null);   // declared but not allowed by the brand, as in the gate
+  assert.equal(allow(152, 'cut'), null);                                              // only the glitch question
+});
+
+test('explainer: transitions get the same tolerance as element edges', () => {
+  const why = makeExplainer({ beats: [], transitions: [{ frames: [295, 299] }], cuts: [] }, { tolerance: 15 });
+  assert.equal(why(310, 'cut'), 'transition');
+  assert.equal(why(320, 'cut'), null);
+});
+
+test('popRatio: a run longer than 100 flags is left to measure, never cleared by a one-frame pop', async () => {
+  const run = { list: Array.from({ length: 160 }, (_, i) => 100 + i), ask_frame: 180 };
+  const m = await popRatio('/nonexistent.mp4', { root: '.', fps: 30, total: 400, run });
+  assert.equal(m.ratio, null);
+  assert.match(m.reason, /long/);
+});
+
+test('triage refuses a video that is not the one the sweep read', async () => {
+  const triage = await import('../../src/commands/triage.mjs');
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-triage-'));
+  fs.writeFileSync(path.join(d, 'other.mp4'), 'not the swept video');
+  fs.writeFileSync(path.join(d, 'sweep.json'), JSON.stringify({ video: path.join(d, 'film.mp4'), video_sha256_12: 'aaaaaaaaaaaa', rows: [], pmin: 0.8, step: 1 }));
+  await assert.rejects(triage.run([d, '--video', path.join(d, 'other.mp4')], { root: d, config: loadConfig(d) }), /not the video the sweep read/);
+  fs.rmSync(d, { recursive: true, force: true });
 });

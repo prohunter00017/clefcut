@@ -65,4 +65,12 @@ test('apply refuses a range that is not GOP-aligned', opts, async () => {
   await assert.rejects(() => applySplice(master, patch, [31, 59], { root, out: path.join(tmp, 'x.mp4') }), /not GOP-aligned/);
 });
 
+
+test('splice plan warns when the master uses B-frames (the packet-timing proof then fails)', opts, async () => {
+  const bmaster = path.join(tmp, 'bframes.mp4');
+  await ff('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=s=160x90:r=30:d=4', '-c:v', 'libx264', '-bf', '3', '-g', '30', '-pix_fmt', 'yuv420p', bmaster], { root });
+  const p = await planSplice(bmaster, [40, 50], { root });
+  assert.ok(p.warnings.some((w) => /B-frames/.test(w)), JSON.stringify(p.warnings));
+});
+
 test('cleanup', () => { fs.rmSync(tmp, { recursive: true, force: true }); });

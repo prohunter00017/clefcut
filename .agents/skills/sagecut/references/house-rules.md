@@ -7,7 +7,7 @@ The house rules are a floor. The brand decides everything above the floor. If a 
 | House rule | SageCut check |
 |---|---|
 | Legibility floors at 1080 px wide: headline 60 px, body 40 px, captions 30 px, URLs and legal text 26 px. Scale the floors with the width of the video. | OCR measures the text height. |
-| Each placement has a test width: 350 px by default, 210 px for 9:16 in a feed, 375 px for 1:1 in a feed. | Sage reads the frame at the test width. |
+| Each placement has a test width: 350 px by default, 210 px for 9:16 in a feed, 375 px for 1:1 in a feed. | Clef reads the frame at the test width. |
 | No blank frame inside a transition. | The ink-coverage check on every frame. |
 | No black opening. No frozen frame longer than 1.5 s, unless the schedule declares the hold. | Measured on every frame. |
 | Elements that move together use one source of timing. | `schedule.json`. |
@@ -26,7 +26,7 @@ The house rules are a floor. The brand decides everything above the floor. If a 
 
 - The minimum anywhere on screen is 26 px at 1080 px wide. Justify any text below 30 px.
 - For other widths, scale the floors in proportion to the width.
-- Measure the text height with OCR at full resolution. Read legibility with Sage at the test width.
+- Measure the text height with OCR at full resolution. Read legibility with Clef at the test width.
 - A brand can set larger sizes in `type`. It cannot set smaller sizes.
 - Full pretty-printed JSON or terminal output cannot be legible on a phone. Cut it to one panel with two or three rows. Do not shrink it.
 

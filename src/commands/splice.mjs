@@ -20,10 +20,11 @@ export async function run(argv, ctx) {
     if (sub === 'plan') {
       const range = parseRange(values.frames);
       const p = await planSplice(master, range, { root });
-      if (values.json) { say(JSON.stringify({ first: p.g0, last: p.g1, frames: p.frames, keyframes: p.keyframes.length, total: p.total })); return 0; }
+      if (values.json) { say(JSON.stringify({ first: p.g0, last: p.g1, frames: p.frames, keyframes: p.keyframes.length, total: p.total, warnings: p.warnings })); return 0; }
+      for (const w of p.warnings) say(`WARNING: ${w}`);
       say(`Master: ${p.total} frames at ${p.fps} fps, ${p.keyframes.length} keyframes.`);
       say(`You asked for frames ${range[0]}-${range[1]}. The GOP-aligned range is ${p.g0}-${p.g1} (${p.frames} frames).`);
-      say(`Render it:  npx remotion render <id> patch.mp4 --codec h264 --crf 17 --frames=${p.g0}-${p.g1}`);
+      say(`Render it:  npx remotion render <id> patch.mp4 --codec h264 --crf 17 --color-space bt709 --frames=${p.g0}-${p.g1}`);
       say(`Then:       sagecut splice apply ${path.basename(master)} patch.mp4 --frames ${p.g0}-${p.g1}`);
       return 0;
     }

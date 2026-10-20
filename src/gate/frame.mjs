@@ -71,12 +71,12 @@ export function edgeCheck(frame, margin, allow) {
   const struct = new Uint8Array(a.length), strong = new Uint8Array(a.length);
   for (let i = 0; i < a.length; i++) { const d = Math.abs(a[i] - bg); struct[i] = d > C.EDGE_STRUCT ? 1 : 0; strong[i] = d > C.EDGE_STRONG ? 1 : 0; }
   if (allow.size) {
-    const B = C.EDGE_BLOCK, hb = Math.floor(h / B), wb = Math.floor(w / B);
+    const B = C.EDGE_BLOCK, hb = Math.ceil(h / B), wb = Math.ceil(w / B);    // ceil: the last 1-3 pixel rows and columns count too
     const blk = new Uint8Array(hb * wb);
-    for (let y = 0; y < hb * B; y++) for (let x = 0; x < wb * B; x++) if (struct[y * w + x]) blk[((y / B) | 0) * wb + ((x / B) | 0)] = 1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (struct[y * w + x]) blk[((y / B) | 0) * wb + ((x / B) | 0)] = 1;
     const ex = edgeExempt(dilate(blk, hb, wb), hb, wb, allow);
-    for (let y = 0; y < hb * B; y++) {
-      for (let x = 0; x < wb * B; x++) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
         if (ex[((y / B) | 0) * wb + ((x / B) | 0)]) { struct[y * w + x] = 0; strong[y * w + x] = 0; }
       }
     }

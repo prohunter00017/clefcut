@@ -96,4 +96,24 @@ test('audio policy: a silent video warns, fails when required, and is info when 
   assert.equal(by(c, 'digital silence'), undefined);
 });
 
+
+test('--fix: a first-pass failure that the re-check does not run still fails the delivery', async () => {
+  const { finalFailures } = await import('../../src/commands/deliver-check.mjs');
+  const first = [{ name: 'placeholder_text', status: 'fail' }, { name: 'faststart', status: 'fail' }, { name: 'loudness', status: 'pass' }];
+  const recheck = [{ name: 'faststart', status: 'pass' }, { name: 'loudness', status: 'pass' }, { name: 'placeholder_text', status: 'skip' }];
+  assert.deepEqual(finalFailures(first, recheck).map((c) => c.name), ['placeholder_text']);
+  assert.deepEqual(finalFailures(first, null).map((c) => c.name), ['placeholder_text', 'faststart']);
+});
+
+test('loudness reads a file whose name has braces, and silence is null, not NaN', opts, async () => {
+  const { loudness } = await import('../../src/core/ffmpeg.mjs');
+  const tone = path.join(tmp, 'film {v2}.mp4'), mute = path.join(tmp, 'mute.mp4');
+  await ff('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=2', '-shortest', '-c:v', 'libx264', '-c:a', 'aac', tone], { root: tmp });
+  await ff('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=2', '-t', '2', '-c:v', 'libx264', '-c:a', 'aac', mute], { root: tmp });
+  const t = await loudness(tone, { root: tmp });
+  assert.ok(Number.isFinite(t.lufs), JSON.stringify(t));
+  const m = await loudness(mute, { root: tmp });
+  assert.ok(m === null || m.lufs === null, JSON.stringify(m));
+});
+
 test('cleanup', () => { fs.rmSync(tmp, { recursive: true, force: true }); });

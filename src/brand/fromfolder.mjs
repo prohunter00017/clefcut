@@ -98,7 +98,7 @@ export function brandFromFolder(dirArg, { root }) {
         const isLogo = /logo|mark|wordmark|brand|lockup|icon/.test(base);
         if (!isLogo && !/logo/i.test(path.relative(dir, path.dirname(f)))) continue;
         let score = 10; if (ext === '.svg') score += 30; if (/logo/.test(base)) score += 20; if (/wordmark|lockup/.test(base)) score += 5;
-        if (/(white|reverse|dark|mono|negative|favicon|icon)/.test(base)) score -= 15;
+        if (/(white|reverse|dark|mono|negative|favicon|icon)/i.test(path.relative(dir, f))) score -= 15;   // the folder counts: logo/white/acme.svg
         let size = null;
         if (ext === '.png') { size = pngSize(fs.readFileSync(f).subarray(0, 32)); if (size && size.w < 128) score -= 10; }
         else if (/<svg/i.test(fs.readFileSync(f, 'utf8').slice(0, 2000)) === false) continue;
@@ -181,7 +181,9 @@ export function brandFromFolder(dirArg, { root }) {
   const logoFiles = [];
   for (const l of logos.slice(0, 2)) {
     fs.mkdirSync(assetsDir, { recursive: true });
-    const dest = path.join(assetsDir, path.basename(l.file));
+    let dest = path.join(assetsDir, path.basename(l.file));
+    // logo/color/acme.svg and logo/white/acme.svg: keep both, under different names
+    if (logoFiles.includes(path.relative(root, dest).split(path.sep).join('/'))) dest = path.join(assetsDir, `${path.basename(path.dirname(l.file))}-${path.basename(l.file)}`);
     fs.copyFileSync(l.file, dest);
     logoFiles.push(path.relative(root, dest).split(path.sep).join('/'));
   }

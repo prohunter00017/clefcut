@@ -10,11 +10,15 @@ export function validateBrand(b) {
   if (!b.name) errors.push('missing "name"');
   const c = b.colors || {};
   for (const k of ['background', 'text', 'primary']) if (!HEX.test(c[k] || '')) errors.push(`colors.${k} must be a #RRGGBB hex value`);
-  for (const v of [...(c.accent || []), ...(c.allowed || [])]) if (!HEX.test(v)) errors.push(`colour ${v} is not a #RRGGBB hex value`);
+  for (const v of [...(Array.isArray(c.accent) ? c.accent : []), ...(Array.isArray(c.allowed) ? c.allowed : [])]) if (!HEX.test(v)) errors.push(`colour ${v} is not a #RRGGBB hex value`);
   if (!b.fonts || !b.fonts.heading || !b.fonts.heading.family) errors.push('fonts.heading.family is missing');
   if (b.format && !['16:9', '9:16', '1:1'].includes(b.format)) errors.push('format must be 16:9, 9:16 or 1:1');
   const m = b.motion || {};
   if (m.style && !['restrained', 'energetic'].includes(m.style)) errors.push('motion.style must be restrained or energetic');
+  const list = (v, where) => { if (v != null && !Array.isArray(v)) errors.push(`${where} must be a list, like [a, b] (got ${JSON.stringify(v)})`); };
+  list(c.accent, 'colors.accent'); list(c.allowed, 'colors.allowed');
+  list((b.logo || {}).files, 'logo.files'); list((b.copy || {}).avoid, 'copy.avoid'); list(m.designed, 'motion.designed');
+  for (const [role, f] of Object.entries(b.fonts || {})) if (f && typeof f === 'object') list(f.weights, `fonts.${role}.weights`);
   return errors;
 }
 

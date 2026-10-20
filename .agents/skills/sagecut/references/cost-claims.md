@@ -16,15 +16,15 @@ For cost claims, use API list prices and measured usage.
 
 | Number | Source |
 |---|---|
-| Frames that Sage read | The sweep and gate runs. |
+| Frames that Clef read | The sweep and gate runs. |
 | QA time | The tool records the seconds of each command. |
-| Sage cost | The text tokens (`billed_input_tokens`) plus the `image_tokens` in the run files, at the plan's input rate. Sage charges image tokens at the input rate. A frame at 960×540 is about 500 image tokens. |
+| Clef cost | The text tokens (`billed_input_tokens`) plus the `image_tokens` in the run files, at the input rate of the Clef model in the run file (clef $0.24, clef-flash $0.038, clef-omni $0.15 per million tokens; Clef charges no output tokens). A frame at 960×540 is 513 image tokens. |
 | Critics' tokens and cost | The tool sums the usage of sub-agents that start with `SAGECUT-CRITIC-<run-id>`. It removes repeated messages by message id and prices them at API list prices, with the measured cache split. |
 | Frames that Claude opened | The number of entries in `opened.json`. |
 
 ## What is an estimate
 
-The old review of the user's video is not measured. The card estimates it at the reference rate: Opus 5.5 critics viewing the same frames that Sage read, at $0.101 and 8.6 s per frame viewed. The rate was measured on Levanto's reference build (a Levanto case-study film, 2026-10-01): 15 Opus 5.5 image critics made 1,009 frame views (358 distinct frames) for $101.96 at Claude API list prices, and ran for 2.41 h of clock time (agents that ran in parallel count once). It is a rate from another film, scaled linearly to the frames Sage read, so the card says "estimate" and names the source.
+The old review of the user's video is not measured. The card estimates it at the reference rate: Opus 5.5 critics viewing the same frames that Clef read, at $0.101 and 8.6 s per frame viewed. The rate was measured on Levanto's reference build (a Levanto case-study film, 2026-10-01): 15 Opus 5.5 image critics made 1,009 frame views (358 distinct frames) for $101.96 at Claude API list prices, and ran for 2.41 h of clock time (agents that ran in parallel count once). It is a rate from another film, scaled linearly to the frames Clef read, so the card says "estimate" and names the source.
 
 SageCut's time is the time of its commands plus the critics' time. The critics' time is the sum of each critic's running time, not the clock time while they ran in parallel. That is the high side of SageCut's time, so the time saved is on the low side.
 
@@ -34,15 +34,15 @@ An estimate always has:
 
 1. The word "estimate".
 2. Its method, for example "at the rate measured on Levanto's reference build" or "from 10 measured frames".
-3. The unit it scales by, for example "per frame that Sage read".
+3. The unit it scales by, for example "per frame that Clef read".
 
 ## How the card is built
 
 1. `sagecut numbers` writes `sagecut/qa/numbers.json` and `sagecut/qa/card.md`.
 2. Show `card.md` as it is. Do not change a number.
 3. The card has three parts:
-   1. SageCut (measured): the frames that Sage read, the QA time, the Sage cost, the critics' cost and the frames that Claude opened.
-   2. The old review of the same frames (estimate at the reference rate, or from a measured baseline): the time and the cost at API list prices. It states them for each frame that Sage read.
+   1. SageCut (measured): the frames that Clef read, the QA time, the Clef cost, the critics' cost and the frames that Claude opened.
+   2. The old review of the same frames (estimate at the reference rate, or from a measured baseline): the time and the cost at API list prices. It states them for each frame that Clef read.
    3. The defects that SageCut found, and the corrections.
 4. The card compares the same frames on both sides. It does not compare SageCut with a review that nobody measured.
 

@@ -131,3 +131,34 @@ test('findCellPops: one cell vanishes in one frame while the rest stays', () => 
   assert.equal(r.rows.length, 1); assert.deepEqual(r.rows[0].frames, [19, 20]);
   assert.equal(S.findCellPops(g, noExcuse, [], [{ rect: [0, 0, 300, 200] }], 1920, 1080).rows.length, 0);   // inside an image region
 });
+
+test('basics: two black opening frames do not become the paper colour', () => {
+  const W = 40, H = 30, g = [];
+  for (let f = 0; f < 20; f++) {
+    const a = new Uint8Array(W * H).fill(f < 2 ? 0 : 240);
+    if (f >= 10) a.fill(20, 0, W * 3);                      // three rows of ink from frame 10
+    g.push(a);
+  }
+  const B = S.basics(g);
+  assert.equal(B.ink[5], 0);                                // a blank paper frame has no ink
+  assert.ok(Math.abs(B.ink[12] - 0.1) < 1e-9, String(B.ink[12]));
+});
+
+test('findCellPops: pops far apart are findings even when evenly spaced (a staged cadence is a few frames apart)', () => {
+  const W = 480, H = 270;
+  const mk = (pops, n) => Array.from({ length: n }, (_, f) => {
+    const a = new Uint8Array(W * H).fill(230);
+    pops.forEach((p, i) => { if (f >= p) { const x0 = 10 + i * 120; for (let y = 50; y < 95; y++) a.fill(20, y * W + x0, y * W + x0 + 60); } });
+    return a;
+  });
+  const far = S.findCellPops(mk([50, 200, 350], 400), () => false, [], [], 1920, 1080);
+  assert.deepEqual(far.rows.map((x) => x.frames[1]), [50, 200, 350]);
+  const staged = S.findCellPops(mk([50, 60, 70], 120), () => false, [], [], 1920, 1080);
+  assert.deepEqual(staged.rows, []);                        // three pops 10 frames apart: a staged cadence
+});
+
+test('declaredHolds: static_holds in every documented form, plus the beat holds', async () => {
+  const { declaredHolds } = await import('../../src/gate/util.mjs');
+  const sched = { static_holds: [[5, 9], { frames: [20, 25] }, { start: 30, end: 35 }, 'bad'], beats: [{ id: 'a', start: 0, end: 99, hold: [40, 99] }, { id: 'b', start: 100, end: 120 }] };
+  assert.deepEqual(declaredHolds(sched), [[5, 9], [20, 25], [30, 35], [40, 99]]);
+});

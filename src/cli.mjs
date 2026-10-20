@@ -26,7 +26,7 @@ const COMMANDS = {
 
 function usage() {
   const lines = Object.entries(COMMANDS).map(([k, m]) => `  ${k.padEnd(15)} ${m.help || ''}`);
-  return `sagecut ${VERSION}: video QA for Remotion with the Sage decision model\n\nusage: sagecut <command> [options]\n\n${lines.join('\n')}\n\nsagecut <command> --help for the options of one command.`;
+  return `sagecut ${VERSION}: video QA for Remotion with the Clef decision model (Cloudflare Workers AI)\n\nusage: sagecut <command> [options]\n\n${lines.join('\n')}\n\nsagecut <command> --help for the options of one command.`;
 }
 
 async function main() {
@@ -35,8 +35,13 @@ async function main() {
   if (cmd === '--version' || cmd === '-v') { console.log(VERSION); return 0; }
   const mod = COMMANDS[cmd];
   if (!mod) { console.error(`unknown command "${cmd}"\n\n${usage()}`); return 2; }
-  const rootArg = argv.indexOf('--root');
-  const root = findProjectRoot(rootArg >= 0 ? argv[rootArg + 1] : process.cwd());
+  // The agent hooks run "savings session-start|stop": they need no project config and must never fail (exit 2 blocks a Stop).
+  if (cmd === 'savings') {
+    try { return await mod.run(argv); } catch (e) { if (['stop', 'session-start'].includes(argv[0])) return 0; throw e; }
+  }
+  const at = argv.findIndex((a) => a === '--root' || a.startsWith('--root='));
+  const rootArg = at < 0 ? null : argv[at].startsWith('--root=') ? argv[at].slice('--root='.length) : argv[at + 1];
+  const root = findProjectRoot(rootArg || process.cwd());
   const config = loadConfig(root);
   return mod.run(argv, { root, config });
 }

@@ -14,7 +14,7 @@ function home() {
 
 const numbers = (over = {}) => ({
   video_sha256_12: 'aaaaaaaaaaaa',
-  sagecut: { frames_read: 300, sage_usd: 0.0066, qa_seconds: 122, critics_usd: 0.363, ...over.sagecut },
+  sagecut: { frames_read: 300, clef_usd: 0.0066, qa_seconds: 122, critics_usd: 0.363, ...over.sagecut },
   old_review_estimate: { usd: 3.97, seconds: 549, ...over.old },
 });
 
@@ -106,4 +106,15 @@ test('a video with no saving says so, never "about $-X"', () => {
 test('totals recompute the saving from both sides of each row', () => {
   const row = { ts: '2026-10-13T09:00:00Z', frames: 300, sagecut_usd: 1, sagecut_seconds: 160, old_usd: 4, old_seconds: 300, saved_usd: 3, saved_seconds: 240 };
   assert.equal(totals([row]).saved_seconds, 140);      // 300 - 160, not the stored 240
+});
+
+test('ledger: a torn line is skipped, never the whole ledger; upsert keeps the good rows', async () => {
+  const { readRows, upsertRow } = await import('../../src/core/savings.mjs');
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sc-ledger-')), f = path.join(d, 'savings.jsonl');
+  fs.writeFileSync(f, ['a', 'b', 'c'].map((sha) => JSON.stringify({ sha, ts: '2026-10-01' })).join('\n') + '\n{"sha":"d","ts":');
+  assert.deepEqual(readRows(f).map((r) => r.sha), ['a', 'b', 'c']);
+  upsertRow({ sha: 'e', ts: '2026-10-02' }, f);
+  assert.deepEqual(readRows(f).map((r) => r.sha), ['a', 'b', 'c', 'e']);
+  assert.deepEqual(fs.readdirSync(d), ['savings.jsonl']);              // no temp file left behind
+  fs.rmSync(d, { recursive: true, force: true });
 });

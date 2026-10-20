@@ -25,6 +25,13 @@ export async function fetchLimited(url, budget, { binary = false, ua = UA, timeo
 const abs = (u, base) => { try { return new URL(u.replace(/&amp;/g, '&'), base).href; } catch { return null; } };
 const attr = (tag, name) => { const m = tag.match(new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i')); return m ? (m[2] ?? m[3] ?? m[4]) : null; };
 
+// The site name from og:site_name or the title, cut at a separator: "Coca-Cola | Home" -> "Coca-Cola". A hyphen
+// separates only with spaces around it, so "Mercedes-Benz USA" stays whole.
+export function siteName(html, u) {
+  const raw = (metaContent(html, 'og:site_name') || (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || '').trim();
+  return raw.split(/\s*[|–—]\s*|\s+-\s+/)[0].trim().slice(0, 60) || u.hostname.replace(/^www\./, '');
+}
+
 export function findLogos(html, base) {
   const cands = [];
   const regions = [...html.matchAll(/<(header|nav)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => m[2]);
@@ -38,8 +45,9 @@ export function findLogos(html, base) {
     for (const m of r.matchAll(/<img\b[^>]*>/gi)) {
       const src = attr(m[0], 'src');
       if (!src || src.startsWith('data:')) continue;
-      const hint = /logo|brand|wordmark/i.test(m[0]);
-      cands.push({ kind: 'img', url: abs(src, base), score: (hint ? 95 : 60) - (/white|reverse|dark|inverse/i.test(src) ? 20 : 0) });
+      const hint = /logo|brand|wordmark/i.test(m[0]), url = abs(src, base);
+      if (!url || !/^https?:/.test(url)) continue;                   // "//:0", "http://": not a fetchable picture
+      cands.push({ kind: 'img', url, score: (hint ? 95 : 60) - (/white|reverse|dark|inverse/i.test(src) ? 20 : 0) });
     }
   }
   for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
@@ -112,7 +120,7 @@ export async function brandFromUrl(urlStr, { root, log = () => {} }) {
     fonts[role] = { family, weights: src ? src.weights : [400, 700], ...(src ? { url: src.url } : {}) };
   }
 
-  const name = (metaContent(html, 'og:site_name') || (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || u.hostname.replace(/^www\./, '')).trim().split(/\s*[|–—-]\s*/)[0].slice(0, 60) || u.hostname;
+  const name = siteName(html, u);
 
   // logos
   const cands = findLogos(html, base);

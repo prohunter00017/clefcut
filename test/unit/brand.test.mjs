@@ -7,7 +7,7 @@ import http from 'node:http';
 import YAML from 'yaml';
 import { parseColor, assignRoles } from '../../src/brand/color.mjs';
 import { analyseCss, pickFontSource } from '../../src/brand/css.mjs';
-import { brandFromUrl, findLogos } from '../../src/brand/fromurl.mjs';
+import { brandFromUrl, findLogos, siteName } from '../../src/brand/fromurl.mjs';
 import { brandFromFolder, sfntNames } from '../../src/brand/fromfolder.mjs';
 import { setBrand, brandTs } from '../../src/brand/write.mjs';
 import { validateBrand } from '../../src/core/brand.mjs';
@@ -146,6 +146,76 @@ test('brand set rejects an invalid brand with the list of errors', async () => {
   fs.writeFileSync(file, YAML.stringify({ name: 'X', colors: { background: 'white', text: '#000000', primary: '#111111' }, fonts: {} }));
   await assert.rejects(() => setBrand(file, { root }), /colors\.background|fonts\.heading/);
   assert.ok(typeof brandTs === 'function');
+});
+
+test('logo candidates skip an img src that is not a valid URL instead of crashing', () => {
+  const html = '<header><img src="//:0" class="logo"><img src="http://"><img src="/brand/logo.svg" alt="logo"></header>';
+  const c = findLogos(html, 'https://example.test/');
+  assert.deepEqual(c.map((x) => x.url), ['https://example.test/brand/logo.svg']);
+});
+
+test('siteName keeps hyphenated names and splits only on a separator', () => {
+  const page = (t) => `<html><head><title>${t}</title></head></html>`;
+  const u = new URL('https://www.example.test/');
+  assert.equal(siteName(page('Mercedes-Benz USA'), u), 'Mercedes-Benz USA');
+  assert.equal(siteName(page('Coca-Cola | Home'), u), 'Coca-Cola');
+  assert.equal(siteName(page('Acme - Rockets and more'), u), 'Acme');
+  assert.equal(siteName(page('Acme — Rockets'), u), 'Acme');
+  assert.equal(siteName('<html></html>', u), 'example.test');
+});
+
+test('brand from-folder keeps two logos with the same file name, and ranks the white one lower by its folder', () => {
+  const dir = mk('kit2');
+  for (const v of ['color', 'white']) {
+    fs.mkdirSync(path.join(dir, 'logo', v), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'logo', v, 'acme-logo.svg'), `<svg xmlns="http://www.w3.org/2000/svg" data-v="${v}" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>`);
+  }
+  fs.writeFileSync(path.join(dir, 'guide.md'), 'Background: #FAFAFA\nText: #111111\n');
+  const root = mk('kit2proj');
+  const r = brandFromFolder(dir, { root });
+  assert.equal(r.draft.logo.files.length, 2);
+  assert.equal(new Set(r.draft.logo.files).size, 2);
+  const first = fs.readFileSync(path.join(root, r.draft.logo.files[0]), 'utf8');
+  assert.match(first, /data-v="color"/);                                   // the colour logo ranks first
+  for (const f of r.draft.logo.files) assert.ok(fs.existsSync(path.join(root, f)), f);
+});
+
+test('validateBrand: list fields must be lists', () => {
+  const base = { name: 'X', colors: { background: '#ffffff', text: '#000000', primary: '#111111' }, fonts: { heading: { family: 'A' } } };
+  assert.deepEqual(validateBrand(base), []);
+  const errs = validateBrand({ ...base, logo: { files: './logo.svg' }, copy: { avoid: 'synergy' }, motion: { designed: 'flash' }, fonts: { heading: { family: 'A', weights: '700' } }, colors: { ...base.colors, accent: '#ff0000' } });
+  for (const k of ['logo.files', 'copy.avoid', 'motion.designed', 'fonts.heading.weights', 'colors.accent']) assert.ok(errs.some((e) => e.includes(k)), `${k}: ${errs.join('; ')}`);
+});
+
+test('brand set: a font that cannot be fetched leaves no stale font file in the brand', async () => {
+  const root = mk('fontfail');
+  const file = path.join(root, 'draft.yaml');
+  fs.writeFileSync(file, YAML.stringify({ name: 'Font Fail', colors: { background: '#ffffff', text: '#000000', primary: '#111111' },
+    fonts: { heading: { family: 'Nope Sans', file: 'fonts/NopeSans-Bold.woff2', files: { 700: 'fonts/NopeSans-Bold.woff2' }, weights: [700] } } }));
+  const orig = globalThis.fetch; globalThis.fetch = async () => { throw new Error('offline'); };
+  try { await setBrand(file, { root, log: () => {} }); } finally { globalThis.fetch = orig; }
+  const b = YAML.parse(fs.readFileSync(path.join(root, 'sagecut', 'brand.yaml'), 'utf8'));
+  assert.equal(b.fonts.heading.file, undefined);
+  assert.equal(b.fonts.heading.files, undefined);
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'src', 'brand.ts'), 'utf8'), /NopeSans/);
+});
+
+test('brand use works in another project after the first project is gone: the saved brand keeps its own logo and fonts', async () => {
+  const a = mk('usesrc');
+  fs.mkdirSync(path.join(a, 'assets'));
+  fs.writeFileSync(path.join(a, 'assets', 'Kit-Bold.woff2'), 'font-bytes');
+  fs.writeFileSync(path.join(a, 'assets', 'kit-mark.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  const file = path.join(a, 'draft.yaml');
+  fs.writeFileSync(file, YAML.stringify({ name: 'Portable Kit', colors: { background: '#ffffff', text: '#000000', primary: '#111111' },
+    fonts: { heading: { family: 'Kit', file: 'assets/Kit-Bold.woff2', weights: [700] } }, logo: { files: ['assets/kit-mark.svg'] } }));
+  await setBrand(file, { root: a, log: () => {} });
+  fs.rmSync(a, { recursive: true, force: true });
+  const b = mk('usedst');
+  const out = []; const orig = console.log; console.log = (...x) => out.push(x.join(' '));
+  try { assert.equal(await brandCmd.run(['use', 'Portable Kit'], { root: b, config: loadConfig(b) }), 0); } finally { console.log = orig; }
+  assert.equal(fs.readFileSync(path.join(b, 'public', 'fonts', 'Kit-Bold.woff2'), 'utf8'), 'font-bytes');
+  assert.ok(fs.existsSync(path.join(b, 'public', 'brand', 'kit-mark.svg')));
+  assert.match(fs.readFileSync(path.join(b, 'src', 'brand.ts'), 'utf8'), /fonts\/Kit-Bold\.woff2/);
 });
 
 test('cleanup', () => { fs.rmSync(tmp, { recursive: true, force: true }); });

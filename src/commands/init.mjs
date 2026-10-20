@@ -40,7 +40,7 @@ export async function run(argv, ctx) {
   writeNew(path.join(sagecutDir(root), 'schedule.json'), JSON.stringify({
     film: composition, fps, frames, width, height, safe_margin_px: Math.round(width * 0.05),
     _help: 'Element role (optional): headline | body | caption | url sets the legibility floor. effects: designed effects, { kind: "flash" | "glitch", frames: [first, last] }; the brand motion.designed list only skips findings inside declared cuts, transitions and effects. static_holds: [[first, last]] declares holds longer than 1.5 s.',
-    beats: [{ id: 'intro', start: 0, end: frames, elements: [{ id: 'title', in: 0, out: frames, text: 'Your title', role: 'headline' }] }],
+    beats: [{ id: 'intro', start: 0, end: frames - 1, elements: [{ id: 'title', in: 0, out: frames - 1, text: 'Your title', role: 'headline' }] }],
     transitions: [],
     effects: [],
   }, null, 2) + '\n');
